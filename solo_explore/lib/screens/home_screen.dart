@@ -7,6 +7,7 @@ import '../models/culinary.dart';
 import '../models/category.dart';
 import '../widgets/notification_badge.dart';
 import '../widgets/app_drawer.dart';
+import '../services/api_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,6 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Category> _categories = [];
   List<Destination> _destinations = [];
   List<Culinary> _culinaries = [];
+  List<dynamic> _recommendedData = [];
   bool _isLoading = true;
   String? _selectedCategory;
 
@@ -28,29 +30,53 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadData();
   }
 
-  Future<void> _loadData() async {
-    try {
-      final categories = await ApiService().getCategories();
-      final destinations = await ApiService().getDestinations();
-      final culinaries = await ApiService().getCulinaries();
-      
-      if (mounted) {
-        setState(() {
-          _categories = categories;
-          _destinations = destinations;
-          _culinaries = culinaries;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading data: $e')),
-        );
-      }
+ Future<void> _loadData() async {
+  try {
+    final categories = await ApiService().getCategories();
+
+    final homeDataResponse = await ApiService().getHomeData();
+
+    print(homeDataResponse);
+
+    final data = homeDataResponse['data'];
+
+    if (mounted) {
+      setState(() {
+        _categories = categories;
+
+        // SAFE ACCESS
+        _recommendedData =
+            data['personalized']?['for_you_destinations'] ?? [];
+
+        final List<dynamic> destJson =
+            data['all_destinations'] ?? [];
+
+        _destinations = destJson
+            .map((json) => Destination.fromJson(json))
+            .toList();
+
+        final List<dynamic> culJson =
+            data['personalized']?['for_you_culinaries'] ?? [];
+
+        _culinaries = culJson
+            .map((json) => Culinary.fromJson(json))
+            .toList();
+
+        _isLoading = false;
+      });
+    }
+  } catch (e, s) {
+    print("ERROR HOME:");
+    print(e);
+    print(s);
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
+}
 
   Future<void> _filterByCategory(String? categorySlug) async {
     setState(() {
@@ -252,44 +278,60 @@ class _HomeScreenState extends State<HomeScreen> {
                     height: 280,
                     child: Center(child: CircularProgressIndicator()),
                   )
-                : SizedBox(
-                    height: 280,
-                    child: _selectedCategory == 'kuliner'
-                        ? (_culinaries.isEmpty
-                            ? const Center(child: Text('Tidak ada kuliner'))
-                            : ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                padding: const EdgeInsets.symmetric(horizontal: 24),
-                                itemCount: _culinaries.length,
-                                itemBuilder: (context, index) {
-                                  final culinary = _culinaries[index];
-                                  return _CulinaryHorizontalCard(
-                                    image: culinary.image,
-                                    name: culinary.name,
-                                    location: culinary.location,
-                                    rating: culinary.rating.toString(),
-                                    slug: culinary.slug,
-                                  );
-                                },
-                              ))
-                        : (_destinations.isEmpty
-                            ? const Center(child: Text('Tidak ada destinasi'))
-                            : ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                padding: const EdgeInsets.symmetric(horizontal: 24),
-                                itemCount: _destinations.length,
-                                itemBuilder: (context, index) {
-                                  final dest = _destinations[index];
-                                  return _DestinationCard(
-                                    image: dest.image,
-                                    name: dest.name,
-                                    location: dest.location,
-                                    rating: dest.rating.toString(),
-                                    slug: dest.slug,
-                                  );
-                                },
-                              )),
-                  ),
+               : SizedBox(
+    height: 280,
+    child: _selectedCategory == 'kuliner'
+        ? (_culinaries.isEmpty
+            ? const Center(child: Text('Tidak ada kuliner'))
+            : ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                itemCount: _culinaries.length,
+                itemBuilder: (context, index) {
+                  final culinary = _culinaries[index];
+                  return _CulinaryHorizontalCard(
+                    image: culinary.image,
+                    name: culinary.name,
+                    location: culinary.location,
+                    rating: culinary.rating.toString(),
+                    slug: culinary.slug,
+                  );
+                },
+              ))
+        : (_selectedCategory == null && _recommendedData.isNotEmpty) // [LOGIKA BARU] Jika kategori "Semua", pakai data Rekomendasi Laravel
+            ? ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                itemCount: _recommendedData.length,
+                itemBuilder: (context, index) {
+                  final rec = _recommendedData[index];
+                  return _DestinationCard(
+                    image: rec['image'] ?? '',
+                    name: rec['name'] ?? '',
+                    location: rec['location'] ?? 'Solo',
+                    rating: (rec['rating'] ?? 0).toString(),
+                    slug: rec['slug'],
+                  );
+                },
+              )
+            : (_destinations.isEmpty // Jika kategori di-filter, pakai list destinasi biasa
+                ? const Center(child: Text('Tidak ada destinasi'))
+                : ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    itemCount: _destinations.length,
+                    itemBuilder: (context, index) {
+                      final dest = _destinations[index];
+                      return _DestinationCard(
+                        image: dest.image,
+                        name: dest.name,
+                        location: dest.location,
+                        rating: dest.rating.toString(),
+                        slug: dest.slug,
+                      );
+                    },
+                  )),
+  ),
           ),
           // Kuliner section
           SliverToBoxAdapter(

@@ -10,18 +10,42 @@ import '../models/event.dart';
 class ApiService {
   // Gunakan 10.0.2.2 untuk Android emulator, atau IP lokal komputer untuk device fisik
   // Contoh device fisik: 'http://192.168.1.x:8000/api'
-  static const String baseUrl = 'http://localhost:8000/api';
+  static const String baseUrl = 'http://127.0.0.1:8000/api';
   String? _token;
+
+  Future<Map<String, dynamic>?> addMenu(String name, String price, String address) async {
+  if (_token == null) await _loadToken();
+  
+  final response = await http.post(
+    Uri.parse('$baseUrl/culinaries'), // Sesuaikan endpoint Laravel kamu
+    headers: {
+      'Authorization': 'Bearer $_token',
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: jsonEncode({
+      'name': name,
+      'price': price,
+      'address': address,
+      'is_available': 1,
+    }),
+  );
+
+  if (response.statusCode == 201 || response.statusCode == 200) {
+    return jsonDecode(response.body);
+  }
+  return null;
+}
 
   Future<void> _loadToken() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('auth_token');
   }
 
-  Future<void> _saveToken(String token) async {
+  Future<void> _saveToken(String _token) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('auth_token', token);
-    _token = token;
+    await prefs.setString('auth_token', _token);
+    _token = _token;
   }
 
   Future<void> clearToken() async {
@@ -29,6 +53,24 @@ class ApiService {
     await prefs.remove('auth_token');
     _token = null;
   }
+
+  // Di dalam class ApiService
+Future<Map<String, dynamic>> replyRating(int ratingId, String replyText) async {
+  final response = await http.post(
+    Uri.parse('$baseUrl/ratings/$ratingId/reply'),
+    headers: {'Authorization': 'Bearer $_token', 'Content-Type': 'application/json'},
+    body: jsonEncode({'reply': replyText}),
+  );
+  return jsonDecode(response.body);
+}
+
+Future<bool> deleteRating(int ratingId) async {
+  final response = await http.delete(
+    Uri.parse('$baseUrl/ratings/$ratingId'),
+    headers: {'Authorization': 'Bearer $_token'},
+  );
+  return response.statusCode == 200;
+}
 
   Map<String, String> _headers({bool needsAuth = false}) {
     final headers = {'Accept': 'application/json', 'Content-Type': 'application/json'};
@@ -38,8 +80,13 @@ class ApiService {
     return headers;
   }
 
-  // Auth
-  Future<Map<String, dynamic>> register(String name, String email, String password, String phone) async {
+ Future<Map<String, dynamic>> register(
+    String name, 
+    String email, 
+    String password, 
+    String phone, 
+    String role, // <--- Pastikan role masuk di sini
+  ) async {
     final response = await http.post(
       Uri.parse('$baseUrl/auth/register'),
       headers: _headers(),
@@ -49,14 +96,13 @@ class ApiService {
         'password': password,
         'password_confirmation': password,
         'phone': phone,
+        'role': role, // <--- Sekarang variabel ini sudah dikenal
       }),
     );
+    
     final data = jsonDecode(response.body);
-    if (data['success']) {
-      await _saveToken(data['data']['token']);
-      return {'success': true, 'user': User.fromJson(data['data']['user'])};
-    }
-    return {'success': false, 'message': data['message']};
+    // Tambahkan pengecekan success dan simpan token jika perlu
+    return data;
   }
 
   Future<Map<String, dynamic>> login(String email, String password) async {
@@ -693,5 +739,48 @@ class ApiService {
     );
     final data = jsonDecode(response.body);
     return data['success'] ?? false;
+  }
+
+  // ============================================================
+  // TARUH DI SINI (DI BAWAH FUNGSI DELETE NOTIFICATION)
+  // ============================================================
+  
+  Future<Map<String, dynamic>> fetchHomeData() async {
+    try {
+      // Kita pakai baseUrl dan _headers() yang sudah lo buat di atas
+      final response = await http.get(
+        Uri.parse('$baseUrl/home'), 
+        headers: _headers() // Pakai helper headers lo biar aman
+      );
+      
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = json.decode(response.body);
+        
+        // Kita ambil isi dari key 'data' karena di Laravel HomeController 
+        // lo ngirimnya: return response()->json(['data' => [...]])
+        return responseData['data'] ?? {}; 
+      } else {
+        print("Server Error di Home: ${response.statusCode}");
+        return {};
+      }
+    } catch (e) {
+      print("Error koneksi di Home: $e");
+      return {};
+    }
+  }
+  
+Future<Map<String, dynamic>> getHomeData() async {
+    try {
+      // Kita langsung tulis alamatnya di sini biar gak pusing nyari variabel baseUrl
+      final response = await http.get(Uri.parse('http://127.0.0.1:8000/api/home'));
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Gagal memuat data home dari Laravel');
+      }
+    } catch (e) {
+      throw Exception('Error koneksi: $e');
+    }
   }
 }

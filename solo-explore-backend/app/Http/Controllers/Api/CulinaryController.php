@@ -64,6 +64,7 @@ class CulinaryController extends Controller
         }
     }
 
+    
     /**
      * Get culinary by slug
      * GET /api/culinaries/{slug}

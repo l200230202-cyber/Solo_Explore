@@ -19,13 +19,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\Api\SocialAuthController;
 use App\Http\Controllers\Api\AIPlannerController;
-use App\Http\Controllers\Api\ImageProxyController;
-
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-*/
+use App\Http\Controllers\Api\ImageProxyController;     
 
 // Public routes
 Route::prefix('auth')->group(function () {

@@ -15,7 +15,7 @@ Route::get('/', function () {
 
 // Admin routes
 Route::prefix('admin')->name('admin.')->group(function () {
-    // Auth routes (no middleware)
+    // Auth routes (Gunakan alias AdminAuthController yang sudah didefinisikan di atas)
     Route::get('login', [AdminAuthController::class, 'showLogin'])->name('login');
     Route::post('login', [AdminAuthController::class, 'login']);
     

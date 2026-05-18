@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/theme.dart';
 import '../services/api_service.dart';
+import 'home_screen.dart'; 
+import 'admin/admin_kuliner_dashboard.dart';
+import '../core/app_router.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,34 +21,59 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
 
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) return;
+  if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
-    try {
-      final result = await ApiService().login(
-        _emailController.text.trim(),
-        _passwordController.text,
-      );
+  setState(() => _isLoading = true);
+  
+  try {
+    final result = await ApiService().login(
+      _emailController.text.trim(),
+      _passwordController.text.trim(),
+    );
 
-      if (!mounted) return;
+    print("DEBUG RESPONSE: $result");
 
-      if (result['success']) {
-        Navigator.pushReplacementNamed(context, '/home');
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? 'Login gagal')),
-        );
+    // 1. Cek sukses
+    if (result['success'] == true) {
+      String? role;
+      var userData = result['user'];
+
+      // 2. LOGIKA ANTI-ERROR: Ambil role dari Instance atau Map
+      try {
+        // Coba ambil sebagai Map dulu
+        role = userData['role']?.toString();
+      } catch (e) {
+        // Kalau gagal (karena dia Instance/Object), ambil pakai titik
+        role = userData.role?.toString();
       }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
 
+      print("ROLE TERDETEKSI: $role");
+
+      if (!mounted) return;
+
+      // 3. Navigasi berdasarkan role
+      if (role == 'admin_kuliner') {
+        Navigator.pushReplacementNamed(context, AppRouter.adminKuliner);
+      } else {
+        Navigator.pushReplacementNamed(context, AppRouter.home);
+      }
+      
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result['message'] ?? 'Login Gagal')),
+      );
+    }
+  } catch (e) {
+    print("DETAIL ERROR: $e");
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Terjadi kesalahan data: $e')),
+      );
+    }
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
+  }
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(

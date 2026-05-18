@@ -17,6 +17,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
+  String _selectedRole = 'user';
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -31,6 +34,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _emailController.text.trim(),
         _passwordController.text,
         _phoneController.text.trim(),
+        _selectedRole,
       );
 
       if (!mounted) return;
@@ -286,6 +290,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     color: AppColors.onSurfaceVariant,
                                   ),
                                 ),
+                                DropdownButtonFormField<String>(
+  value: _selectedRole,
+  decoration: InputDecoration(
+    labelText: 'Daftar Sebagai',
+    prefixIcon: const Icon(Icons.person_pin_rounded, color: Colors.green),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+  ),
+  items: const [
+    DropdownMenuItem(value: 'user', child: Text('Wisatawan')),
+    DropdownMenuItem(value: 'admin_kuliner', child: Text('Pemilik Resto (Mitra)')),
+  ],
+  onChanged: (value) {
+    setState(() {
+      _selectedRole = value!;
+    });
+  },
+), // <--- Pastikan ada koma dan kurung tutup ini!
+   
+   
+   
                                 const SizedBox(height: 8),
                                 GestureDetector(
                                   onTap: () => Navigator.pop(context),

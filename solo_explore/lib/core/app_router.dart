@@ -15,6 +15,8 @@ import '../screens/trip_plan_detail_screen.dart';
 import '../screens/forgot_password_screen.dart';
 import '../screens/reset_password_screen.dart';
 import '../screens/notifications_screen.dart';
+// IMPORT BARU:
+import '../screens/admin/admin_kuliner_dashboard.dart'; 
 
 class AppRouter {
   static const String designSystem = '/design-system';
@@ -33,6 +35,9 @@ class AppRouter {
   static const String forgotPassword = '/forgot-password';
   static const String resetPassword = '/reset-password';
   static const String notifications = '/notifications';
+  
+  // TAMBAHKAN VARIABLE ROUTE BARU:
+  static const String adminKuliner = '/admin-kuliner';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -48,6 +53,11 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const RegisterScreen());
       case home:
         return MaterialPageRoute(builder: (_) => const MainShell());
+      
+      // TAMBAHKAN CASE BARU UNTUK ADMIN:
+      case adminKuliner:
+        return MaterialPageRoute(builder: (_) => const AdminKulinerDashboard());
+
       case destinationDetail:
         final slug = settings.arguments as String;
         return MaterialPageRoute(builder: (_) => DestinationDetailScreen(slug: slug));
@@ -79,7 +89,12 @@ class AppRouter {
       case notifications:
         return MaterialPageRoute(builder: (_) => const NotificationsScreen());
       default:
-        return MaterialPageRoute(builder: (_) => const SplashScreen());
+        // Jangan arahkan ke SplashScreen jika rute tidak ada, biar ketahuan errornya
+        return MaterialPageRoute(
+          builder: (_) => Scaffold(
+            body: Center(child: Text('No route defined for ${settings.name}')),
+          ),
+        );
     }
   }
 }

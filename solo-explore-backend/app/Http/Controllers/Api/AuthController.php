@@ -42,6 +42,7 @@ class AuthController extends Controller
                         'name' => $user->name,
                         'email' => $user->email,
                         'phone' => $user->phone,
+                        'role' => $user->role,
                         'avatar' => $user->avatar,
                         'level' => $user->level,
                         'level_title' => $user->level_title,
@@ -99,27 +100,29 @@ class AuthController extends Controller
 
             $token = $user->createToken('auth_token')->plainTextToken;
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Login successful',
-                'data' => [
-                    'user' => [
-                        'id' => $user->id,
-                        'name' => $user->name,
-                        'email' => $user->email,
-                        'phone' => $user->phone,
-                        'avatar' => $user->avatar,
-                        'bio' => $user->bio,
-                        'level' => $user->level,
-                        'level_title' => $user->level_title,
-                        'points' => $user->points,
-                        'total_destinations' => $user->total_destinations,
-                        'is_verified' => $user->is_verified,
-                    ],
-                    'token' => $token,
-                ],
-                'errors' => null,
-            ], 200);
+           // Cari baris 104 di AuthController.php
+return response()->json([
+    'success' => true,
+    'message' => 'Login successful',
+    'data' => [
+        'user' => [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'role' => $user->role, // <--- INI YANG TADI HILANG
+            'avatar' => $user->avatar,
+            'bio' => $user->bio,
+            'level' => $user->level,
+            'level_title' => $user->level_title,
+            'points' => $user->points,
+            'total_destinations' => $user->total_destinations,
+            'is_verified' => $user->is_verified,
+        ],
+        'token' => $token,
+    ],
+    'errors' => null,
+], 200);
 
         } catch (ValidationException $e) {
             return response()->json([
@@ -181,6 +184,7 @@ class AuthController extends Controller
                     'name' => $user->name,
                     'email' => $user->email,
                     'phone' => $user->phone,
+                    'role' => $user->role,
                     'avatar' => $user->avatar,
                     'bio' => $user->bio,
                     'level' => $user->level,
