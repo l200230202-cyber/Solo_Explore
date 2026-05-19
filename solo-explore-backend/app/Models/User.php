@@ -42,7 +42,12 @@ class User extends Authenticatable
         'total_destinations' => 'integer',
     ];
 
-    // Relationships
+    public function interests()
+    {
+        return $this->belongsToMany(Category::class, 'user_interests')
+                    ->withTimestamps();
+    }
+
     public function visits()
     {
         return $this->hasMany(Visit::class);
@@ -82,13 +87,13 @@ class User extends Authenticatable
         return $this->hasMany(Notification::class);
     }
 
-    // Scopes
+    // --- Scopes ---
     public function scopeVerified($query)
     {
         return $query->where('is_verified', true);
     }
 
-    // Methods
+    // --- Methods ---
     public function addPoints(int $points): void
     {
         $this->increment('points', $points);

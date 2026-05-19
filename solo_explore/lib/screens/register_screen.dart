@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/theme.dart';
 import '../services/api_service.dart';
+import '../models/category.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -17,6 +18,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
+  List<Category> _categories = [];
+
+  final List<int> _selectedCategoryIds = [];
+
+  bool _isLoadingCategories = true;
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -31,6 +39,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _emailController.text.trim(),
         _passwordController.text,
         _phoneController.text.trim(),
+        _selectedCategoryIds,
       );
 
       if (!mounted) return;
@@ -39,16 +48,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
         Navigator.pushReplacementNamed(context, '/home');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? 'Registrasi gagal')),
+          SnackBar(
+            content: Text(result['message'] ?? 'Registrasi gagal'),
+            backgroundColor: Colors.red, // Biar warnanya merah menandakan error
+          ),
         );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Detail Error: $e')));
+      debugPrint('Error saat registrasi: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories(); // Ambil data kategori dari API saat halaman dibuka
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final categories = await ApiService().getCategories();
+
+      if (!mounted) return;
+
+      setState(() {
+        _categories = categories;
+        _isLoadingCategories = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoadingCategories = false;
+      });
+
+      debugPrint('Gagal memuat kategori: $e');
     }
   }
 
@@ -198,7 +238,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             hint: 'Min. 8 karakter',
                             isPassword: true,
                             obscureText: _obscurePassword,
-                            onTogglePassword: () => setState(() => _obscurePassword = !_obscurePassword),
+                            onTogglePassword: () => setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            ),
                           ),
                           const SizedBox(height: 20),
                           // Confirm Password
@@ -209,13 +251,58 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             hint: 'Ulangi password',
                             isPassword: true,
                             obscureText: _obscureConfirmPassword,
-                            onTogglePassword: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                            onTogglePassword: () => setState(
+                              () => _obscureConfirmPassword =
+                                  !_obscureConfirmPassword,
+                            ),
                             validator: (v) {
-                              if (v!.isEmpty) return 'Konfirmasi password harus diisi';
-                              if (v != _passwordController.text) return 'Password tidak cocok';
+                              if (v!.isEmpty) {
+                                return 'Konfirmasi password harus diisi';
+                              }
+                              if (v != _passwordController.text) {
+                                return 'Password tidak cocok';
+                              }
                               return null;
                             },
                           ),
+                          const SizedBox(height: 20),
+                          const Text(
+                            "Pilih Minat Wisata & Kuliner:",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+
+                          _isLoadingCategories
+                              ? const Center(
+                                  child: CircularProgressIndicator(),
+                                ) // Loading pas ambil data dari Laravel
+                              : Wrap(
+                                  spacing: 8.0,
+                                  children: _categories.map((category) {
+                                    final isSelected = _selectedCategoryIds
+                                        .contains(category.id);
+                                    return FilterChip(
+                                      label: Text(category.name),
+                                      selected: isSelected,
+                                      onSelected: (bool selected) {
+                                        setState(() {
+                                          if (selected) {
+                                            _selectedCategoryIds.add(
+                                              category.id,
+                                            );
+                                          } else {
+                                            _selectedCategoryIds.remove(
+                                              category.id,
+                                            );
+                                          }
+                                        });
+                                      },
+                                    );
+                                  }).toList(),
+                                ),
                           const SizedBox(height: 32),
                           // Register Button
                           SizedBox(
@@ -230,7 +317,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   borderRadius: BorderRadius.circular(100),
                                 ),
                                 elevation: 0,
-                                shadowColor: AppColors.primary.withValues(alpha: 0.3),
+                                shadowColor: AppColors.primary.withValues(
+                                  alpha: 0.3,
+                                ),
                               ),
                               child: _isLoading
                                   ? const SizedBox(
@@ -242,7 +331,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       ),
                                     )
                                   : Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Text(
                                           'Register Now',
@@ -252,7 +342,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                           ),
                                         ),
                                         const SizedBox(width: 8),
-                                        const Icon(Icons.arrow_forward, size: 20),
+                                        const Icon(
+                                          Icons.arrow_forward,
+                                          size: 20,
+                                        ),
                                       ],
                                     ),
                             ),
@@ -360,16 +453,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(
-                color: AppColors.primary,
-                width: 2,
-              ),
+              borderSide: BorderSide(color: AppColors.primary, width: 2),
             ),
-            prefixIcon: Icon(
-              icon,
-              color: AppColors.onSurfaceVariant,
-              size: 20,
-            ),
+            prefixIcon: Icon(icon, color: AppColors.onSurfaceVariant, size: 20),
             suffixIcon: isPassword
                 ? IconButton(
                     icon: Icon(
@@ -380,14 +466,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     onPressed: onTogglePassword,
                   )
                 : null,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
           ),
-          validator: validator ??
-              (v) {
-                if (v!.isEmpty) return '$label harus diisi';
-                if (isPassword && v.length < 8) return 'Password minimal 8 karakter';
-                return null;
-              },
+          validator: (v) {
+            if (v!.isEmpty) {
+              return '$label harus diisi';
+            }
+
+            if (isPassword && v.length < 8) {
+              return 'Password minimal 8 karakter';
+            }
+
+            return null;
+          },
         ),
       ],
     );

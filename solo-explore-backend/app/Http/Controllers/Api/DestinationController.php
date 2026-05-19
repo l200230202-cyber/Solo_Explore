@@ -170,6 +170,54 @@ class DestinationController extends Controller
     }
 
     /**
+     * Get personalized destination recommendations based on logged-in user's interests
+     * GET /api/destinations/recommendations
+     */
+    public function recommendations(Request $request)
+    {
+        try {
+            $user = $request->user(); // Mendeteksi token user yang aktif (Abdul)
+
+            $query = Destination::with('category');
+
+            // 🔐 JIKA USER LOGIN: Filter destinasi berdasarkan minat kategori mereka
+            if ($user && $user->interests()->exists()) {
+                $userInterestIds = $user->interests()->pluck('category_id');
+                $query->whereIn('category_id', $userInterestIds);
+            } else {
+                // JIKA GUEST (BELUM LOGIN): Kasih destinasi berlabel featured atau rating tertinggi
+                $query->featured();
+            }
+
+            $perPage = $request->get('per_page', 5); // Default ambil 5 data wisata untuk Beranda
+            $destinations = $query->orderBy('rating', 'desc')->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Personalized destination recommendations retrieved successfully',
+                'data' => [
+                    'current_page' => $destinations->currentPage(),
+                    'data' => collect($destinations->items())->map(function ($dest) {
+                        return $this->formatDestination($dest);
+                    }),
+                    'per_page' => $destinations->perPage(),
+                    'total' => $destinations->total(),
+                    'last_page' => $destinations->lastPage(),
+                ],
+                'errors' => null,
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve destination recommendations',
+                'data' => null,
+                'errors' => ['server' => [$e->getMessage()]],
+            ], 500);
+        }
+    }
+    
+    /**
      * Format destination for list view
      */
     private function formatDestination($dest)

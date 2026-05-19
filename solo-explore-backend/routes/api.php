@@ -45,6 +45,10 @@ Route::prefix('password')->group(function () {
 });
 
 // Public data routes
+    // Recommendations
+Route::get('/destinations/recommendations', [DestinationController::class, 'recommendations']);
+Route::get('/culinaries/recommendations', [CulinaryController::class, 'recommendations']);
+
 Route::get('categories', [CategoryController::class, 'index']);
 Route::get('destinations', [DestinationController::class, 'index']);
 Route::get('destinations/{slug}', [DestinationController::class, 'show']);

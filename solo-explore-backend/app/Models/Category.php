@@ -23,7 +23,17 @@ class Category extends Model
         'order' => 'integer',
     ];
 
-    // Relationships
+    // --- Relationships ---
+
+    /**
+     * Relasi ke User (Siapa saja yang meminati kategori ini)
+     */
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'user_interests')
+                    ->withTimestamps();
+    }
+
     public function destinations()
     {
         return $this->hasMany(Destination::class);
@@ -39,7 +49,7 @@ class Category extends Model
         return $this->hasMany(Event::class);
     }
 
-    // Scopes
+    // --- Scopes ---
     public function scopeActive($query)
     {
         return $query->where('is_active', true);

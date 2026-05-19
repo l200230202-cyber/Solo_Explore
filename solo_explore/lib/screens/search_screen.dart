@@ -7,7 +7,8 @@ import '../models/culinary.dart';
 import '../models/event.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  final String? initialCategory;
+  const SearchScreen({super.key, this.initialCategory});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -19,11 +20,65 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Destination> _destinations = [];
   List<Culinary> _culinaries = [];
   List<Event> _events = [];
+  bool _isArgsProcessed = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    if (!_isArgsProcessed) {
+      final String? targetCategory = widget.initialCategory;
+
+      if (targetCategory != null && targetCategory.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (mounted) {
+            // 1. Teks di search bar tetap muncul "kuliner" secara visual
+            _searchController.text = targetCategory;
+
+            // 2. Jalankan trik bypass: Jika kirimannya 'kuliner', langsung panggil API kuliner riil!
+            if (targetCategory.toLowerCase() == 'kuliner') {
+              setState(() => _isLoading = true);
+              try {
+                // Tembak langsung API kuliner dari Laravel
+                final dataKuliner = await ApiService().getCulinaries(
+                  featured: true,
+                );
+
+                setState(() {
+                  _culinaries = dataKuliner;
+                  _destinations = []; // Pastikan destinasi kosong
+                  _events = []; // Pastikan event kosong
+                });
+              } catch (e) {
+                debugPrint('Error fetch kuliner direct: $e');
+              } finally {
+                setState(() => _isLoading = false);
+              }
+            } else {
+              // Jika argumennya bukan 'kuliner', jalankan search biasa
+              _search(targetCategory);
+            }
+          }
+        });
+      }
+      _isArgsProcessed = true;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _loadInitialContent();
+
+    // Kita cek dulu: Konten default (destinasi, kuliner, event yang campur)
+    // HANYA akan di-load jika user masuk manual ke menu search.
+    // Jika user masuk karena klik 'Lihat Semua' dari beranda, fungsi ini akan dilewati.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final String? targetCategory =
+          ModalRoute.of(context)?.settings.arguments as String?;
+      if (targetCategory == null || targetCategory.isEmpty) {
+        _loadInitialContent(); // 👈 Ini memanggil fungsi bawaanmu yang di bawah
+      }
+    });
   }
 
   Future<void> _loadInitialContent() async {
@@ -32,7 +87,7 @@ class _SearchScreenState extends State<SearchScreen> {
       final destinations = await ApiService().getDestinations(featured: true);
       final culinaries = await ApiService().getCulinaries(featured: true);
       final events = await ApiService().getEvents(upcoming: true);
-      
+
       if (mounted) {
         setState(() {
           _destinations = destinations;
@@ -57,25 +112,37 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() => _isLoading = true);
     try {
       final results = await ApiService().search(query);
+
       setState(() {
-        _destinations = results['destinations'];
-        _culinaries = results['culinaries'];
-        _events = results['events'];
+        if (query.toLowerCase() == 'kuliner') {
+          _culinaries = List<Culinary>.from(results['culinaries'] ?? []);
+          _destinations = [];
+          _events = [];
+        } else {
+          _destinations = List<Destination>.from(results['destinations'] ?? []);
+          _culinaries = List<Culinary>.from(results['culinaries'] ?? []);
+          _events = List<Event>.from(results['events'] ?? []);
+        }
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final hasResults = _destinations.isNotEmpty || _culinaries.isNotEmpty || _events.isNotEmpty;
+    final hasResults =
+        _destinations.isNotEmpty ||
+        _culinaries.isNotEmpty ||
+        _events.isNotEmpty;
 
     return Scaffold(
       backgroundColor: AppColors.surfaceContainerLowest,
@@ -100,108 +167,114 @@ class _SearchScreenState extends State<SearchScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : !hasResults && _searchController.text.isNotEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search_off, size: 64, color: AppColors.outline),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Tidak ada hasil',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.search_off, size: 64, color: AppColors.outline),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Tidak ada hasil',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onSurfaceVariant,
+                    ),
                   ),
-                )
-              : !hasResults && _searchController.text.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.search, size: 64, color: AppColors.outline),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Cari destinasi, kuliner, atau event',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
+                ],
+              ),
+            )
+          : !hasResults && _searchController.text.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.search, size: 64, color: AppColors.outline),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Cari destinasi, kuliner, atau event',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                if (_destinations.isNotEmpty) ...[
+                  Text(
+                    'Destinasi',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ..._destinations.map(
+                    (d) => _SearchResultCard(
+                      title: d.name,
+                      subtitle: d.location,
+                      image: d.image,
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        '/destination',
+                        arguments: d.slug,
                       ),
-                    )
-                  : ListView(
-                  padding: const EdgeInsets.all(24),
-                  children: [
-                    if (_destinations.isNotEmpty) ...[
-                      Text(
-                        'Destinasi',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+                if (_culinaries.isNotEmpty) ...[
+                  Text(
+                    'Kuliner',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ..._culinaries.map(
+                    (c) => _SearchResultCard(
+                      title: c.name,
+                      subtitle: c.location,
+                      image: c.image,
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        '/culinary',
+                        arguments: c.slug,
                       ),
-                      const SizedBox(height: 12),
-                      ..._destinations.map((d) => _SearchResultCard(
-                            title: d.name,
-                            subtitle: d.location,
-                            image: d.image,
-                            onTap: () => Navigator.pushNamed(
-                              context,
-                              '/destination',
-                              arguments: d.slug,
-                            ),
-                          )),
-                      const SizedBox(height: 24),
-                    ],
-                    if (_culinaries.isNotEmpty) ...[
-                      Text(
-                        'Kuliner',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+                if (_events.isNotEmpty) ...[
+                  Text(
+                    'Event',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ..._events.map(
+                    (e) => _SearchResultCard(
+                      title: e.name,
+                      subtitle: e.location,
+                      image: e.image,
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        '/event',
+                        arguments: e.slug,
                       ),
-                      const SizedBox(height: 12),
-                      ..._culinaries.map((c) => _SearchResultCard(
-                            title: c.name,
-                            subtitle: c.location,
-                            image: c.image,
-                            onTap: () => Navigator.pushNamed(
-                              context,
-                              '/culinary',
-                              arguments: c.slug,
-                            ),
-                          )),
-                      const SizedBox(height: 24),
-                    ],
-                    if (_events.isNotEmpty) ...[
-                      Text(
-                        'Event',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      ..._events.map((e) => _SearchResultCard(
-                            title: e.name,
-                            subtitle: e.location,
-                            image: e.image,
-                            onTap: () => Navigator.pushNamed(
-                              context,
-                              '/event',
-                              arguments: e.slug,
-                            ),
-                          )),
-                    ],
-                  ],
-                ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
     );
   }
 }

@@ -31,7 +31,7 @@ class _SplashScreenState extends State<SplashScreen> {
     if (token != null && token.isNotEmpty) {
       Navigator.pushReplacementNamed(context, AppRouter.home);
     } else if (hasSeenOnboarding) {
-      Navigator.pushReplacementNamed(context, AppRouter.login);
+      Navigator.pushReplacementNamed(context, AppRouter.home);
     } else {
       Navigator.pushReplacementNamed(context, AppRouter.onboarding);
     }
@@ -93,13 +93,20 @@ class _SplashScreenState extends State<SplashScreen> {
                               height: 32,
                               decoration: const BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [AppColors.primary, AppColors.primaryContainer],
+                                  colors: [
+                                    AppColors.primary,
+                                    AppColors.primaryContainer,
+                                  ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.explore, color: Colors.white, size: 18),
+                              child: const Icon(
+                                Icons.explore,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Text(
@@ -113,7 +120,10 @@ class _SplashScreenState extends State<SplashScreen> {
                           ],
                         ),
                         TextButton(
-                          onPressed: () => Navigator.pushReplacementNamed(context, AppRouter.home),
+                          onPressed: () => Navigator.pushReplacementNamed(
+                            context,
+                            AppRouter.home,
+                          ),
                           child: Text(
                             'Lewati',
                             style: GoogleFonts.beVietnamPro(
@@ -141,7 +151,11 @@ class _SplashScreenState extends State<SplashScreen> {
                                   fit: BoxFit.cover,
                                   errorBuilder: (_, _, _) => Container(
                                     color: AppColors.surfaceContainer,
-                                    child: const Icon(Icons.image, size: 64, color: AppColors.outline),
+                                    child: const Icon(
+                                      Icons.image,
+                                      size: 64,
+                                      color: AppColors.outline,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -156,17 +170,24 @@ class _SplashScreenState extends State<SplashScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.1),
+                                        color: Colors.black.withValues(
+                                          alpha: 0.1,
+                                        ),
                                         blurRadius: 16,
                                       ),
                                     ],
                                   ),
                                   child: Row(
                                     children: [
-                                      const Icon(Icons.location_on, color: AppColors.secondary, size: 20),
+                                      const Icon(
+                                        Icons.location_on,
+                                        color: AppColors.secondary,
+                                        size: 20,
+                                      ),
                                       const SizedBox(width: 8),
                                       Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             'DESTINASI UTAMA',
@@ -252,7 +273,10 @@ class _SplashScreenState extends State<SplashScreen> {
                               height: 6,
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
-                                  colors: [AppColors.primary, AppColors.primaryContainer],
+                                  colors: [
+                                    AppColors.primary,
+                                    AppColors.primaryContainer,
+                                  ],
                                 ),
                                 borderRadius: BorderRadius.circular(3),
                               ),
@@ -283,7 +307,10 @@ class _SplashScreenState extends State<SplashScreen> {
                           width: double.infinity,
                           height: 56,
                           child: ElevatedButton.icon(
-                            onPressed: () => Navigator.pushReplacementNamed(context, AppRouter.onboarding),
+                            onPressed: () => Navigator.pushReplacementNamed(
+                              context,
+                              AppRouter.onboarding,
+                            ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,

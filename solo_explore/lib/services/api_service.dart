@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../models/destination.dart';
@@ -31,7 +32,10 @@ class ApiService {
   }
 
   Map<String, String> _headers({bool needsAuth = false}) {
-    final headers = {'Accept': 'application/json', 'Content-Type': 'application/json'};
+    final headers = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
     if (needsAuth && _token != null) {
       headers['Authorization'] = 'Bearer $_token';
     }
@@ -39,7 +43,13 @@ class ApiService {
   }
 
   // Auth
-  Future<Map<String, dynamic>> register(String name, String email, String password, String phone) async {
+  Future<Map<String, dynamic>> register(
+    String name,
+    String email,
+    String password,
+    String phone,
+    List<int> categoryIds,
+  ) async {
     final response = await http.post(
       Uri.parse('$baseUrl/auth/register'),
       headers: _headers(),
@@ -49,8 +59,10 @@ class ApiService {
         'password': password,
         'password_confirmation': password,
         'phone': phone,
+        'category_ids': categoryIds,
       }),
     );
+
     final data = jsonDecode(response.body);
     if (data['success']) {
       await _saveToken(data['data']['token']);
@@ -65,6 +77,7 @@ class ApiService {
       headers: _headers(),
       body: jsonEncode({'email': email, 'password': password}),
     );
+
     final data = jsonDecode(response.body);
     if (data['success']) {
       await _saveToken(data['data']['token']);
@@ -75,7 +88,10 @@ class ApiService {
 
   Future<void> logout() async {
     await _loadToken();
-    await http.post(Uri.parse('$baseUrl/auth/logout'), headers: _headers(needsAuth: true));
+    await http.post(
+      Uri.parse('$baseUrl/auth/logout'),
+      headers: _headers(needsAuth: true),
+    );
     await clearToken();
   }
 
@@ -131,7 +147,11 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> resetPassword(String token, String email, String password) async {
+  Future<Map<String, dynamic>> resetPassword(
+    String token,
+    String email,
+    String password,
+  ) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/password/reset'),
@@ -149,10 +169,7 @@ class ApiService {
         'message': data['message'] ?? 'Terjadi kesalahan',
       };
     } catch (e) {
-      return {
-        'success': false,
-        'message': 'Terjadi kesalahan: $e',
-      };
+      return {'success': false, 'message': 'Terjadi kesalahan: $e'};
     }
   }
 
@@ -161,10 +178,7 @@ class ApiService {
       final response = await http.post(
         Uri.parse('$baseUrl/password/verify-token'),
         headers: _headers(),
-        body: jsonEncode({
-          'token': token,
-          'email': email,
-        }),
+        body: jsonEncode({'token': token, 'email': email}),
       );
       final data = jsonDecode(response.body);
       return data['success'] ?? false;
@@ -175,7 +189,10 @@ class ApiService {
 
   // Categories
   Future<List<Category>> getCategories() async {
-    final response = await http.get(Uri.parse('$baseUrl/categories'), headers: _headers());
+    final response = await http.get(
+      Uri.parse('$baseUrl/categories'),
+      headers: _headers(),
+    );
     final data = jsonDecode(response.body);
     if (data['success']) {
       return (data['data'] as List).map((e) => Category.fromJson(e)).toList();
@@ -184,13 +201,19 @@ class ApiService {
   }
 
   // Destinations
-  Future<List<Destination>> getDestinations({String? category, bool? featured}) async {
+  Future<List<Destination>> getDestinations({
+    String? category,
+    bool? featured,
+  }) async {
     await _loadToken();
     var url = '$baseUrl/destinations?per_page=100&';
     if (category != null) url += 'category=$category&';
     if (featured != null) url += 'featured=$featured&';
-    
-    final response = await http.get(Uri.parse(url), headers: _headers(needsAuth: _token != null));
+
+    final response = await http.get(
+      Uri.parse(url),
+      headers: _headers(needsAuth: _token != null),
+    );
     final data = jsonDecode(response.body);
     if (data['success']) {
       final items = data['data']['data'] ?? data['data'];
@@ -217,8 +240,11 @@ class ApiService {
     await _loadToken();
     var url = '$baseUrl/culinaries?per_page=100&';
     if (featured != null) url += 'featured=$featured';
-    
-    final response = await http.get(Uri.parse(url), headers: _headers(needsAuth: _token != null));
+
+    final response = await http.get(
+      Uri.parse(url),
+      headers: _headers(needsAuth: _token != null),
+    );
     final data = jsonDecode(response.body);
     if (data['success']) {
       final items = data['data']['data'] ?? data['data'];
@@ -240,13 +266,72 @@ class ApiService {
     return null;
   }
 
+  Future<List<dynamic>> getPersonalizedRecommendations(
+    String? userInterestCategory,
+  ) async {
+    await _loadToken();
+
+    String url = '$baseUrl/destinations/recommendations';
+    bool isCulinary = false;
+
+    if (userInterestCategory != null &&
+        userInterestCategory.toLowerCase().contains('kuliner')) {
+      url = '$baseUrl/culinaries/recommendations';
+      isCulinary = true;
+    }
+
+    try {
+      debugPrint('=== [DEBUG API START] ===');
+      debugPrint('1. URL Target: $url');
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: _headers(needsAuth: _token != null),
+      );
+
+      debugPrint('2. Status Code: ${response.statusCode}');
+      debugPrint('3. Isi Response Body Mentah: ${response.body}');
+
+      final data = jsonDecode(response.body);
+
+      if (data['success'] == true) {
+        final items = data['data']['data'] ?? data['data'];
+
+        debugPrint(
+          '4. Tipe data "items" setelah diekstrak: ${items.runtimeType}',
+        );
+        debugPrint(
+          '5. Jumlah items yang terdeteksi: ${items is List ? items.length : "Bukan List"}',
+        );
+
+        if (items is List) {
+          if (isCulinary) {
+            return items.map((e) => Culinary.fromJson(e)).toList();
+          } else {
+            return items.map((e) => Destination.fromJson(e)).toList();
+          }
+        }
+      } else {
+        debugPrint('X. Laravel merespon "success: false"');
+      }
+    } catch (e) {
+      debugPrint('X. Terjadi Crash/Error di Flutter: $e');
+    }
+
+    debugPrint('=== [DEBUG API END] ===');
+    return [];
+  }
+
   // Events
   Future<List<Event>> getEvents({bool? upcoming}) async {
     await _loadToken();
     var url = '$baseUrl/events?';
     if (upcoming != null) url += 'upcoming=$upcoming';
-    
-    final response = await http.get(Uri.parse(url), headers: _headers(needsAuth: _token != null));
+
+    final response = await http.get(
+      Uri.parse(url),
+      headers: _headers(needsAuth: _token != null),
+    );
     final data = jsonDecode(response.body);
     if (data['success']) {
       final items = data['data']['data'] ?? data['data'];
@@ -302,16 +387,27 @@ class ApiService {
     final data = jsonDecode(response.body);
     if (data['success']) {
       return {
-        'destinations': (data['data']['destinations'] as List).map((e) => Destination.fromJson(e)).toList(),
-        'culinaries': (data['data']['culinaries'] as List).map((e) => Culinary.fromJson(e)).toList(),
-        'events': (data['data']['events'] as List).map((e) => Event.fromJson(e)).toList(),
+        'destinations': (data['data']['destinations'] as List)
+            .map((e) => Destination.fromJson(e))
+            .toList(),
+        'culinaries': (data['data']['culinaries'] as List)
+            .map((e) => Culinary.fromJson(e))
+            .toList(),
+        'events': (data['data']['events'] as List)
+            .map((e) => Event.fromJson(e))
+            .toList(),
       };
     }
     return {'destinations': [], 'culinaries': [], 'events': []};
   }
 
   // Reviews
-  Future<bool> addReviewDestination(int id, int rating, String comment, {List<String>? images}) async {
+  Future<bool> addReviewDestination(
+    int id,
+    int rating,
+    String comment, {
+    List<String>? images,
+  }) async {
     await _loadToken();
     final response = await http.post(
       Uri.parse('$baseUrl/destinations/$id/reviews'),
@@ -319,14 +415,19 @@ class ApiService {
       body: jsonEncode({
         'rating': rating,
         'comment': comment,
-        'images': images,  // ✅ FIXED: Removed ? operator
+        'images': images,
       }),
     );
     final data = jsonDecode(response.body);
     return data['success'] ?? false;
   }
 
-  Future<bool> addReviewCulinary(int id, int rating, String comment, {List<String>? images}) async {
+  Future<bool> addReviewCulinary(
+    int id,
+    int rating,
+    String comment, {
+    List<String>? images,
+  }) async {
     await _loadToken();
     final response = await http.post(
       Uri.parse('$baseUrl/culinaries/$id/reviews'),
@@ -334,7 +435,7 @@ class ApiService {
       body: jsonEncode({
         'rating': rating,
         'comment': comment,
-        'images': images,  // ✅ FIXED: Removed ? operator
+        'images': images,
       }),
     );
     final data = jsonDecode(response.body);
@@ -348,7 +449,7 @@ class ApiService {
       Uri.parse('$baseUrl/visits/destinations/$id'),
       headers: _headers(needsAuth: true),
       body: jsonEncode({
-        'visit_date': DateTime.now().toIso8601String().split('T')[0],  // ✅ FIXED: Add visit_date
+        'visit_date': DateTime.now().toIso8601String().split('T')[0],
       }),
     );
     final data = jsonDecode(response.body);
@@ -361,7 +462,7 @@ class ApiService {
       Uri.parse('$baseUrl/visits/culinaries/$id'),
       headers: _headers(needsAuth: true),
       body: jsonEncode({
-        'visit_date': DateTime.now().toIso8601String().split('T')[0],  // ✅ FIXED: Add visit_date
+        'visit_date': DateTime.now().toIso8601String().split('T')[0],
       }),
     );
     final data = jsonDecode(response.body);
@@ -551,7 +652,7 @@ class ApiService {
       Uri.parse('$baseUrl/trip-plans'),
       headers: _headers(needsAuth: true),
       body: jsonEncode({
-        'title': name,  // ✅ FIXED: Backend expects 'title' not 'name'
+        'title': name, // ✅ FIXED: Backend expects 'title' not 'name'
         'description': description,
         'start_date': startDate.toIso8601String().split('T')[0],
         'end_date': endDate.toIso8601String().split('T')[0],
@@ -561,7 +662,10 @@ class ApiService {
     return data;
   }
 
-  Future<Map<String, dynamic>> updateTripPlan(int id, Map<String, dynamic> planData) async {
+  Future<Map<String, dynamic>> updateTripPlan(
+    int id,
+    Map<String, dynamic> planData,
+  ) async {
     await _loadToken();
     final response = await http.put(
       Uri.parse('$baseUrl/trip-plans/$id'),

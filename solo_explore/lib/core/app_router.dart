@@ -50,31 +50,39 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const MainShell());
       case destinationDetail:
         final slug = settings.arguments as String;
-        return MaterialPageRoute(builder: (_) => DestinationDetailScreen(slug: slug));
+        return MaterialPageRoute(
+          builder: (_) => DestinationDetailScreen(slug: slug),
+        );
       case culinaryDetail:
         final slug = settings.arguments as String;
-        return MaterialPageRoute(builder: (_) => CulinaryDetailScreen(slug: slug));
+        return MaterialPageRoute(
+          builder: (_) => CulinaryDetailScreen(slug: slug),
+        );
       case eventDetail:
         final slug = settings.arguments as String;
         return MaterialPageRoute(builder: (_) => EventDetailScreen(slug: slug));
       case search:
-        return MaterialPageRoute(builder: (_) => const SearchScreen());
+        final args = settings.arguments as String?;
+        return MaterialPageRoute(
+          builder: (_) => SearchScreen(initialCategory: args),
+          settings: settings,
+        );
       case badges:
         return MaterialPageRoute(builder: (_) => const BadgesScreen());
       case rewards:
         return MaterialPageRoute(builder: (_) => const RewardsScreen());
       case tripPlanDetail:
         final planId = settings.arguments as int;
-        return MaterialPageRoute(builder: (_) => TripPlanDetailScreen(planId: planId));
+        return MaterialPageRoute(
+          builder: (_) => TripPlanDetailScreen(planId: planId),
+        );
       case forgotPassword:
         return MaterialPageRoute(builder: (_) => const ForgotPasswordScreen());
       case resetPassword:
         final args = settings.arguments as Map<String, String>;
         return MaterialPageRoute(
-          builder: (_) => ResetPasswordScreen(
-            token: args['token']!,
-            email: args['email']!,
-          ),
+          builder: (_) =>
+              ResetPasswordScreen(token: args['token']!, email: args['email']!),
         );
       case notifications:
         return MaterialPageRoute(builder: (_) => const NotificationsScreen());

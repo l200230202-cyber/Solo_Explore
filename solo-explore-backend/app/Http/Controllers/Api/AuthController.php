@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -22,32 +23,43 @@ class AuthController extends Controller
                 'email' => 'required|string|email|max:255|unique:users',
                 'password' => 'required|string|min:8|confirmed',
                 'phone' => 'nullable|string|max:20',
+                'category_ids' => 'nullable|array', 
+                'category_ids.*' => 'exists:categories,id', 
             ]);
 
-            $user = User::create([
-                'name' => $validated['name'],
-                'email' => $validated['email'],
-                'password' => Hash::make($validated['password']),
-                'phone' => $validated['phone'] ?? null,
-            ]);
+            $result = DB::transaction(function () use ($validated) {
+                $user = User::create([
+                    'name' => $validated['name'],
+                    'email' => $validated['email'],
+                    'password' => Hash::make($validated['password']),
+                    'phone' => $validated['phone'] ?? null,
+                ]);
 
-            $token = $user->createToken('auth_token')->plainTextToken;
+                if (!empty($validated['category_ids'])) {
+                    $user->interests()->attach($validated['category_ids']);
+                }
+
+                return $user;
+            });
+
+            $token = $result->createToken('auth_token')->plainTextToken;
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registration successful',
+                'message' => 'Registration successful with interests',
                 'data' => [
                     'user' => [
-                        'id' => $user->id,
-                        'name' => $user->name,
-                        'email' => $user->email,
-                        'phone' => $user->phone,
-                        'avatar' => $user->avatar,
-                        'level' => $user->level,
-                        'level_title' => $user->level_title,
-                        'points' => $user->points,
-                        'total_destinations' => $user->total_destinations,
-                        'is_verified' => $user->is_verified,
+                        'id' => $result->id,
+                        'name' => $result->name,
+                        'email' => $result->email,
+                        'phone' => $result->phone,
+                        'avatar' => $result->avatar,
+                        'level' => $result->level,
+                        'level_title' => $result->level_title,
+                        'points' => $result->points,
+                        'total_destinations' => $result->total_destinations,
+                        'is_verified' => $result->is_verified,
+                        'interests' => $result->interests()->pluck('name'), 
                     ],
                     'token' => $token,
                 ],
@@ -64,7 +76,7 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Registration failed',
+                'message' => 'Error Laravel: ' . $e->getMessage(),
                 'data' => null,
                 'errors' => ['server' => [$e->getMessage()]],
             ], 500);
@@ -73,7 +85,6 @@ class AuthController extends Controller
 
     /**
      * Login user
-     * POST /api/auth/login
      */
     public function login(Request $request)
     {
@@ -94,9 +105,7 @@ class AuthController extends Controller
                 ], 401);
             }
 
-            // Revoke all previous tokens
             $user->tokens()->delete();
-
             $token = $user->createToken('auth_token')->plainTextToken;
 
             return response()->json([
@@ -140,7 +149,6 @@ class AuthController extends Controller
 
     /**
      * Logout user
-     * POST /api/auth/logout
      */
     public function logout(Request $request)
     {
@@ -166,7 +174,6 @@ class AuthController extends Controller
 
     /**
      * Get authenticated user
-     * GET /api/auth/me
      */
     public function me(Request $request)
     {
@@ -188,6 +195,7 @@ class AuthController extends Controller
                     'points' => $user->points,
                     'total_destinations' => $user->total_destinations,
                     'is_verified' => $user->is_verified,
+                    'interests' => $user->interests, // Tampilkan minat saat panggil 'me'
                     'created_at' => $user->created_at->toISOString(),
                 ],
                 'errors' => null,

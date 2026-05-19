@@ -14,10 +14,11 @@ class ProfileController extends Controller
      * Get user profile
      * GET /api/profile
      */
-    public function show()
+public function show()
     {
         try {
-            $user = auth()->user();
+            // 🎯 Muat user beserta relasi interests dari database
+            $user = auth()->user()->load('interests');
 
             return response()->json([
                 'success' => true,
@@ -35,6 +36,13 @@ class ProfileController extends Controller
                     'total_destinations' => $user->total_destinations,
                     'is_verified' => $user->is_verified,
                     'created_at' => $user->created_at->toISOString(),
+                    'interests' => $user->interests->map(function($interest) {
+                        return [
+                            'id' => $interest->id,
+                            'name' => $interest->name,
+                            'slug' => $interest->slug,
+                        ];
+                    }),
                 ],
                 'errors' => null,
             ], 200);

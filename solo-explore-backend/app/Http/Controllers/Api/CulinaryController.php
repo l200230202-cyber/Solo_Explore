@@ -138,7 +138,59 @@ class CulinaryController extends Controller
             ], 500);
         }
     }
+    /**
+     * Get personalized culinary recommendations based on logged-in user's interests
+     * GET /api/culinaries/recommendations
+     */
+    public function recommendations(Request $request)
+    {
+        try {
+            $user = $request->user(); 
 
+            $query = Culinary::with('category');
+
+            if ($user && $user->interests()->exists()) {
+                $userInterestIds = $user->interests()->pluck('category_id');
+                $query->whereIn('category_id', $userInterestIds);
+            } else {
+                $query->featured();
+            }
+
+            $perPage = $request->get('per_page', 5);
+            $culinaries = $query->orderBy('rating', 'desc')->paginate($perPage);
+
+            // 🛠️ FIX FALLBACK: Jika hasil filter minat ternyata kosong (0),
+            // kita ambil data kuliner terbaru/terpopuler secara umum agar data tidak kosong.
+            if ($culinaries->isEmpty()) {
+                $culinaries = Culinary::with('category')
+                    ->orderBy('rating', 'desc')
+                    ->paginate($perPage);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Personalized culinary recommendations retrieved successfully',
+                'data' => [
+                    'current_page' => $culinaries->currentPage(),
+                    'data' => collect($culinaries->items())->map(function ($culinary) {
+                        return $this->formatCulinary($culinary);
+                    }),
+                    'per_page' => $culinaries->perPage(),
+                    'total' => $culinaries->total(),
+                    'last_page' => $culinaries->lastPage(),
+                ],
+                'errors' => null,
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve culinary recommendations',
+                'data' => null,
+                'errors' => ['server' => [$e->getMessage()]],
+            ], 500);
+        }
+    }
     /**
      * Format culinary for list view
      */
