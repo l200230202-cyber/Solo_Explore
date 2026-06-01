@@ -10,7 +10,8 @@ class AuthController extends Controller
 {
     public function showLogin()
     {
-        if (Auth::check() && Auth::user()->is_admin) {
+        // MODIFIKASI: Cek menggunakan role baru
+        if (Auth::check() && in_array(Auth::user()->role, ['super_admin', 'admin_mitra']) && Auth::user()->is_active) {
             return redirect()->route('admin.dashboard');
         }
         return view('admin.auth.login');
@@ -24,12 +25,26 @@ class AuthController extends Controller
         ]);
 
         if (Auth::attempt($credentials, $request->filled('remember'))) {
-            if (Auth::user()->is_admin) {
+            $user = Auth::user();
+
+            // MODIFIKASI: Cek apakah user adalah super_admin atau admin_mitra
+            if (in_array($user->role, ['super_admin', 'admin_mitra'])) {
+                
+                // KUNCI KEAMANAN: Jika dia admin_mitra tapi belum diaktifkan (is_active == false), tendang keluar
+                if (!$user->is_active) {
+                    Auth::logout();
+                    return back()->withErrors([
+                        'email' => 'Akun Anda sedang ditinjau oleh Super Admin. Mohon tunggu aktivasi.',
+                    ])->onlyInput('email');
+                }
+
+                // Jika lolos semua pemeriksaan, barulah boleh masuk
                 $request->session()->regenerate();
                 return redirect()->intended(route('admin.dashboard'))
-                    ->with('success', 'Welcome back, ' . Auth::user()->name);
+                    ->with('success', 'Welcome back, ' . $user->name);
             }
             
+            // Jika role-nya bukan super_admin atau admin_mitra (misal user biasa)
             Auth::logout();
             return back()->withErrors([
                 'email' => 'You do not have admin access.',

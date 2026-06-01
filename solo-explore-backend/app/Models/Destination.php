@@ -30,6 +30,7 @@ class Destination extends Model
         'is_open',
         'is_featured',
         'views',
+        'user_id',
     ];
 
     protected $casts = [
@@ -124,5 +125,10 @@ class Destination extends Model
             return $this->image;
         }
         return asset('storage/' . $this->image);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }

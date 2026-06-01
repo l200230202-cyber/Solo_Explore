@@ -31,6 +31,7 @@ class Culinary extends Model
         'is_halal',
         'is_featured',
         'views',
+        'user_id',
     ];
 
     protected $casts = [
@@ -123,5 +124,9 @@ class Culinary extends Model
             return $this->image;
         }
         return asset('storage/' . $this->image);
+    }
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }

@@ -12,12 +12,21 @@ class CulinaryController extends Controller
 {
     public function index(Request $request)
     {
+        $user = auth()->user();
         $query = Culinary::with('category');
+        
+        // --- MODIFIKASI: Filter kuliner jika yang login bukan super_admin ---
+        if ($user->role !== 'super_admin') {
+            $query->where('user_id', $user->id);
+        }
+        // --------------------------------------------------------------------
         
         if ($request->has('search')) {
             $search = $request->search;
-            $query->where('name', 'like', "%{$search}%")
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
                   ->orWhere('description', 'like', "%{$search}%");
+            });
         }
         
         $culinaries = $query->latest()->paginate(10);
@@ -47,6 +56,10 @@ class CulinaryController extends Controller
             'facilities' => 'nullable|string',
         ]);
 
+        // --- MODIFIKASI: Otomatis ikat data kuliner dengan ID akun penginput ---
+        $validated['user_id'] = auth()->id();
+        // ----------------------------------------------------------------------
+
         // Generate slug
         $validated['slug'] = \Illuminate\Support\Str::slug($validated['name']);
         $originalSlug = $validated['slug'];
@@ -70,12 +83,24 @@ class CulinaryController extends Controller
 
     public function edit(Culinary $culinary)
     {
+        // --- MODIFIKASI: Proteksi bypass URL ID kuliner ---
+        if (auth()->user()->role !== 'super_admin' && $culinary->user_id !== auth()->id()) {
+            abort(403, 'Anda tidak memiliki akses untuk mengubah data kuliner ini.');
+        }
+        // ---------------------------------------------------
+
         $categories = Category::all();
         return view('admin.culinaries.edit', compact('culinary', 'categories'));
     }
 
     public function update(Request $request, Culinary $culinary)
     {
+        // --- MODIFIKASI: Proteksi bypass URL ID kuliner ---
+        if (auth()->user()->role !== 'super_admin' && $culinary->user_id !== auth()->id()) {
+            abort(403, 'Anda tidak memiliki akses untuk mengubah data kuliner ini.');
+        }
+        // ---------------------------------------------------
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'required|string',
@@ -122,6 +147,12 @@ class CulinaryController extends Controller
 
     public function destroy(Culinary $culinary)
     {
+        // --- MODIFIKASI: Proteksi bypass URL ID kuliner ---
+        if (auth()->user()->role !== 'super_admin' && $culinary->user_id !== auth()->id()) {
+            abort(403, 'Anda tidak memiliki akses untuk menghapus data kuliner ini.');
+        }
+        // ---------------------------------------------------
+
         if ($culinary->image && !filter_var($culinary->image, FILTER_VALIDATE_URL)) {
             Storage::disk('public')->delete($culinary->image);
         }

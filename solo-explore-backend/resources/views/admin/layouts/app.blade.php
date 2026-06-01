@@ -9,7 +9,6 @@
 </head>
 <body class="bg-gray-100">
     <div class="flex h-screen">
-        <!-- Sidebar -->
         <aside class="w-64 bg-blue-900 text-white">
             <div class="p-4">
                 <h1 class="text-2xl font-bold">Solo Explore</h1>
@@ -25,21 +24,26 @@
                 <a href="{{ route('admin.culinaries.index') }}" class="flex items-center px-4 py-3 hover:bg-blue-800 {{ request()->routeIs('admin.culinaries.*') ? 'bg-blue-800' : '' }}">
                     <i class="fas fa-utensils mr-3"></i> Kuliner
                 </a>
-                <a href="{{ route('admin.events.index') }}" class="flex items-center px-4 py-3 hover:bg-blue-800 {{ request()->routeIs('admin.events.*') ? 'bg-blue-800' : '' }}">
-                    <i class="fas fa-calendar mr-3"></i> Event
-                </a>
-                <a href="{{ route('admin.categories.index') }}" class="flex items-center px-4 py-3 hover:bg-blue-800 {{ request()->routeIs('admin.categories.*') ? 'bg-blue-800' : '' }}">
-                    <i class="fas fa-tags mr-3"></i> Kategori
-                </a>
-                <a href="{{ route('admin.users.index') }}" class="flex items-center px-4 py-3 hover:bg-blue-800 {{ request()->routeIs('admin.users.*') ? 'bg-blue-800' : '' }}">
-                    <i class="fas fa-users mr-3"></i> Users
-                </a>
+
+                @if(auth()->user()->role === 'super_admin')
+                    <a href="{{ route('admin.events.index') }}" class="flex items-center px-4 py-3 hover:bg-blue-800 {{ request()->routeIs('admin.events.*') ? 'bg-blue-800' : '' }}">
+                        <i class="fas fa-calendar mr-3"></i> Event
+                    </a>
+                    <a href="{{ route('admin.categories.index') }}" class="flex items-center px-4 py-3 hover:bg-blue-800 {{ request()->routeIs('admin.categories.*') ? 'bg-blue-800' : '' }}">
+                        <i class="fas fa-tags mr-3"></i> Kategori
+                    </a>
+
+                    <a href="{{ route('admin.users.requests') }}" class="flex items-center px-4 py-3 hover:bg-blue-800 {{ request()->routeIs('admin.users.requests') ? 'bg-blue-800' : '' }}">
+                        <i class="fas fa-user-clock mr-3"></i> Permintaan Mitra
+                    </a>
+                    <a href="{{ route('admin.users.index') }}" class="flex items-center px-4 py-3 hover:bg-blue-800 {{ request()->routeIs('admin.users.*') && !request()->routeIs('admin.users.requests') ? 'bg-blue-800' : '' }}">
+                        <i class="fas fa-users mr-3"></i> Users
+                    </a>
+                @endif
             </nav>
         </aside>
 
-        <!-- Main Content -->
         <div class="flex-1 flex flex-col overflow-hidden">
-            <!-- Header -->
             <header class="bg-white shadow-sm">
                 <div class="flex items-center justify-between px-6 py-4">
                     <h2 class="text-xl font-semibold text-gray-800">@yield('header', 'Dashboard')</h2>
@@ -55,7 +59,6 @@
                 </div>
             </header>
 
-            <!-- Content -->
             <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6">
                 @if(session('success'))
                     <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">

@@ -76,4 +76,33 @@ class UserController extends Controller
         $user->delete();
         return redirect()->route('admin.users.index')->with('success', 'User berhasil dihapus!');
     }
+    public function mitraRequests()
+    {
+        // Ambil user yang role-nya admin_mitra dan is_active masih 0 (false)
+        $requests = User::where('role', 'admin_mitra')
+                        ->where('is_active', false)
+                        ->latest()
+                        ->paginate(10);
+
+        return view('admin.users.requests', compact('requests'));
+    }
+
+    // 2. Fungsi untuk Menyetujui Akun Mitra
+    public function approveMitra(User $user)
+    {
+        $user->update(['is_active' => true]);
+
+        return redirect()->route('admin.users.requests')
+            ->with('success', "Akun mitra {$user->name} berhasil diaktifkan!");
+    }
+
+    // 3. Fungsi untuk Menolak/Menghapus Akun Mitra
+    public function rejectMitra(User $user)
+    {
+        // Anda bisa menghapusnya langsung dari database
+        $user->delete();
+
+        return redirect()->route('admin.users.requests')
+            ->with('success', "Pendaftaran mitra {$user->name} telah ditolak dan dihapus.");
+    }
 }

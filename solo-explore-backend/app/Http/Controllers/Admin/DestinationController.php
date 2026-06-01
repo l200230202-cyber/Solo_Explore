@@ -12,12 +12,21 @@ class DestinationController extends Controller
 {
     public function index(Request $request)
     {
+        $user = auth()->user();
         $query = Destination::with('category');
         
+        // --- MODIFIKASI: Filter data berdasarkan Role ---
+        if ($user->role !== 'super_admin') {
+            $query->where('user_id', $user->id);
+        }
+        // ------------------------------------------------
+
         if ($request->has('search')) {
             $search = $request->search;
-            $query->where('name', 'like', "%{$search}%")
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
                   ->orWhere('description', 'like', "%{$search}%");
+            });
         }
         
         $destinations = $query->latest()->paginate(10);
@@ -47,6 +56,10 @@ class DestinationController extends Controller
             'facilities' => 'nullable|string',
         ]);
 
+        // --- MODIFIKASI: Otomatis isi user_id dari user yang sedang login ---
+        $validated['user_id'] = auth()->id();
+        // ------------------------------------------------------------------
+
         // Generate slug from name
         $validated['slug'] = \Illuminate\Support\Str::slug($validated['name']);
         
@@ -74,12 +87,22 @@ class DestinationController extends Controller
 
     public function edit(Destination $destination)
     {
+        // Opsional: Mencegah admin_mitra lain mengedit paksa lewat URL id orang lain
+        if (auth()->user()->role !== 'super_admin' && $destination->user_id !== auth()->id()) {
+            abort(403, 'Anda tidak memiliki akses untuk mengedit destinasi ini.');
+        }
+
         $categories = Category::all();
         return view('admin.destinations.edit', compact('destination', 'categories'));
     }
 
     public function update(Request $request, Destination $destination)
     {
+        // Opsional: Mencegah admin_mitra lain mengupdate paksa lewat URL id orang lain
+        if (auth()->user()->role !== 'super_admin' && $destination->user_id !== auth()->id()) {
+            abort(403, 'Anda tidak memiliki akses untuk mengubah destinasi ini.');
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'required|string',
@@ -132,6 +155,11 @@ class DestinationController extends Controller
 
     public function destroy(Destination $destination)
     {
+        // Opsional: Mencegah admin_mitra lain menghapus paksa lewat URL id orang lain
+        if (auth()->user()->role !== 'super_admin' && $destination->user_id !== auth()->id()) {
+            abort(403, 'Anda tidak memiliki akses untuk menghapus destinasi ini.');
+        }
+
         // Only delete if it's a local file, not external URL
         if ($destination->image && !filter_var($destination->image, FILTER_VALIDATE_URL)) {
             Storage::disk('public')->delete($destination->image);
