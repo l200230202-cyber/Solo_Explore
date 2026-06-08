@@ -836,6 +836,20 @@ class ApiService {
     return data;
   }
 
+  Future<Map<String, dynamic>> generateTripPlan(
+    int planId,
+    Map<String, dynamic> data,
+  ) async {
+    await _loadToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/trip-plans/$planId/generate'),
+      headers: _headers(needsAuth: true),
+      body: jsonEncode(data),
+    );
+    final decodedData = jsonDecode(response.body);
+    return decodedData;
+  }
+
   // Notifications
   Future<Map<String, dynamic>> getNotifications({int page = 1}) async {
     await _loadToken();

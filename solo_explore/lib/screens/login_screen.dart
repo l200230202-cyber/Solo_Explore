@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/theme.dart';
 import '../services/api_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -38,9 +39,9 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -69,7 +70,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           width: 96,
                           height: 96,
                           decoration: BoxDecoration(
-                            color: AppColors.surfaceContainerHigh.withValues(alpha: 0.4),
+                            color: AppColors.surfaceContainerHigh.withValues(
+                              alpha: 0.4,
+                            ),
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -104,7 +107,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         letterSpacing: -0.5,
                       ),
                     ),
-                    const SizedBox(height: 48),
+                    const SizedBox(height: 40),
+
                     // Headline
                     Align(
                       alignment: Alignment.centerLeft,
@@ -131,7 +135,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 32),
+
                     // Email Field
                     _buildModernTextField(
                       label: 'EMAIL',
@@ -141,6 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       keyboardType: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 24),
+
                     // Password Field
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -158,7 +164,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             GestureDetector(
-                              onTap: () => Navigator.pushNamed(context, '/forgot-password'),
+                              onTap: () => Navigator.pushNamed(
+                                context,
+                                '/forgot-password',
+                              ),
                               child: Text(
                                 'LUPA PASSWORD?',
                                 style: GoogleFonts.beVietnamPro(
@@ -183,7 +192,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             hintText: '••••••••',
                             hintStyle: GoogleFonts.beVietnamPro(
                               fontSize: 14,
-                              color: AppColors.onSurfaceVariant.withValues(alpha: 0.4),
+                              color: AppColors.onSurfaceVariant.withValues(
+                                alpha: 0.4,
+                              ),
                             ),
                             filled: true,
                             fillColor: AppColors.surfaceContainerLow,
@@ -205,19 +216,30 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                                color: AppColors.onSurfaceVariant.withValues(alpha: 0.6),
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: AppColors.onSurfaceVariant.withValues(
+                                  alpha: 0.6,
+                                ),
                                 size: 20,
                               ),
-                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                              onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              ),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
                           ),
-                          validator: (v) => v!.isEmpty ? 'Password harus diisi' : null,
+                          validator: (v) =>
+                              v!.isEmpty ? 'Password harus diisi' : null,
                         ),
                       ],
                     ),
                     const SizedBox(height: 32),
+
                     // Login Button
                     SizedBox(
                       width: double.infinity,
@@ -231,7 +253,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             borderRadius: BorderRadius.circular(100),
                           ),
                           elevation: 0,
-                          shadowColor: AppColors.primary.withValues(alpha: 0.15),
+                          shadowColor: AppColors.primary.withValues(
+                            alpha: 0.15,
+                          ),
                         ),
                         child: _isLoading
                             ? const SizedBox(
@@ -252,146 +276,95 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 32),
-                    // Separator
+
+                    // 🛠️ LINK REGISTER UNTUK USER BIASA
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Expanded(
-                          child: Container(
-                            height: 1,
-                            color: AppColors.outlineVariant.withValues(alpha: 0.2),
+                        Text(
+                          'Belum punya akun? ',
+                          style: GoogleFonts.beVietnamPro(
+                            fontSize: 14,
+                            color: AppColors.onSurfaceVariant,
                           ),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                        GestureDetector(
+                          onTap: () =>
+                              Navigator.pushNamed(context, '/register'),
                           child: Text(
-                            'ATAU',
+                            'Daftar Sekarang',
                             style: GoogleFonts.beVietnamPro(
-                              fontSize: 10,
+                              fontSize: 14,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.onSurfaceVariant.withValues(alpha: 0.6),
-                              letterSpacing: 2,
+                              color: AppColors.primary,
+                              decoration: TextDecoration.underline,
+                              decorationColor: AppColors.primary.withValues(
+                                alpha: 0.3,
+                              ),
                             ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Container(
-                            height: 1,
-                            color: AppColors.outlineVariant.withValues(alpha: 0.2),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
-                    // Social Logins
-                    _buildSocialButton(
-                      label: 'Lanjutkan dengan Google',
-                      icon: Icons.g_mobiledata,
-                      onTap: () {},
-                    ),
-                    const SizedBox(height: 12),
-                    _buildSocialButton(
-                      label: 'Lanjutkan dengan Facebook',
-                      icon: Icons.facebook,
-                      onTap: () {},
-                    ),
-                    const SizedBox(height: 48),
-                    // Registration Link
-                    Text(
-                      'Belum punya akun?',
-                      style: GoogleFonts.beVietnamPro(
-                        fontSize: 14,
-                        color: AppColors.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    GestureDetector(
-                      onTap: () => Navigator.pushNamed(context, '/register'),
-                      child: Text(
-                        'Daftar Sekarang',
-                        style: GoogleFonts.beVietnamPro(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                          decoration: TextDecoration.underline,
-                          decorationColor: AppColors.primary.withValues(alpha: 0.3),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 64),
-                    // Decorative Images
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Transform.rotate(
-                          angle: 0.05,
-                          child: Container(
-                            width: 96,
-                            height: 96,
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceContainerLowest,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 16,
-                                ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: ColorFiltered(
-                                colorFilter: ColorFilter.mode(
-                                  Colors.grey.withValues(alpha: 0.3),
-                                  BlendMode.saturation,
-                                ),
-                                child: Image.network(
-                                  'https://lh3.googleusercontent.com/aida-public/AB6AXuByPZk79AzbXNaeQG4lfv8cPXayc0sf4rPzT-bO4nmElhUO7mGBnrTbAJrSdPnCgdWO4ifOZQ3GeZRmrPOWb8FxuZFGFapjOgBBgrpF9b83ChX6CyGqiK8Ki0aUfNnb_dnPy45qpiz0_DjeEZ1F2mDWTNnyC4BDzatApQIsKtDvopuKuPb4mtNJy2BE0l2-KMECe0cd6rrv-Cdf4X9RVbD6BKCucjQ_3noX0jwpS-EkXuCH-lov6LF99gp9Zl6q2BH8zHU5bt6L21s',
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => Container(
-                                    color: AppColors.surfaceContainer,
-                                  ),
-                                ),
-                              ),
-                            ),
+
+                    // 🛠️ JALUR KHUSUS UNTUK REGISTER ADMIN & MITRA TEMPAT
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.outlineVariant.withValues(
+                            alpha: 0.2,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Transform.rotate(
-                          angle: -0.1,
-                          child: Container(
-                            width: 96,
-                            height: 96,
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceContainerLowest,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 16,
-                                ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: ColorFiltered(
-                                colorFilter: ColorFilter.mode(
-                                  Colors.grey.withValues(alpha: 0.3),
-                                  BlendMode.saturation,
-                                ),
-                                child: Image.network(
-                                  'https://lh3.googleusercontent.com/aida-public/AB6AXuDmDgPuv1Cvw7Zt_l_AQNr12jZxt-RWjTF-hAXeWgizGVPux6vkgZt4mysEc-KPRD4qgJ2VnyHCrwlCTeT2ifDXhbFCusM58qYO36xzhz20Fi6LuuWbY7ja4bPUh6fr4vyXvXUGR5jP6RfZgP9pcMmbu4vgfG3KSZ1NkfK4e_NdubNVtW2clxJ81y4LkfTP299gjt1MTT-v4wuk4oImgJlF4I28chscqQ1XN4fs0OrkRBHh5u2uVEXXEnLJ5dn8hv1zDMKWm2atyJw',
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => Container(
-                                    color: AppColors.surfaceContainer,
-                                  ),
-                                ),
-                              ),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'Ingin mengembangkan pariwisata Solo?',
+                            style: GoogleFonts.beVietnamPro(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.onSurfaceVariant,
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 4),
+                          GestureDetector(
+                            onTap: () async {
+                              final Uri url = Uri.parse(
+                                'http://192.168.0.3:8000/register-mitra',
+                              );
+
+                              if (!await launchUrl(
+                                url,
+                                mode: LaunchMode.externalApplication,
+                              )) {
+                                // 🛠️ PERBAIKAN: Hubungkan langsung pengecekan mounted ke variabel 'context'
+                                if (!context.mounted) return;
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Tidak dapat membuka halaman pendaftaran',
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                            child: Text(
+                              'Daftar sebagai Admin / Mitra Tempat',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.secondary,
+                              ),
+                            ),
+                          )
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -444,62 +417,17 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(
-                color: AppColors.primary,
-                width: 2,
-              ),
+              borderSide: const BorderSide(color: AppColors.primary, width: 2),
             ),
-            prefixIcon: Icon(
-              icon,
-              color: AppColors.onSurfaceVariant,
-              size: 20,
+            prefixIcon: Icon(icon, color: AppColors.onSurfaceVariant, size: 20),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
           validator: (v) => v!.isEmpty ? 'Email harus diisi' : null,
         ),
       ],
-    );
-  }
-
-  Widget _buildSocialButton({
-    required String label,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(100),
-      child: Container(
-        width: double.infinity,
-        height: 52,
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
-          border: Border.all(
-            color: AppColors.outlineVariant.withValues(alpha: 0.2),
-          ),
-          borderRadius: BorderRadius.circular(100),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: AppColors.onSurface,
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: GoogleFonts.beVietnamPro(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.onSurface,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

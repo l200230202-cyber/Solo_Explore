@@ -491,170 +491,124 @@ class TripPlanController extends Controller
             $interests = $validated['interests'];
             $duration = $validated['duration'];
 
-            // Clear existing items
+            // Bersihkan itinerary lama sebelum generate yang baru
             $tripPlan->items()->delete();
 
-            // Get available destinations and culinaries
+            // Ambil destinasi yang sesuai dengan ketertarikan (kategori slug)
             $availableDestinations = Destination::whereHas('category', function ($query) use ($interests) {
                 $query->whereIn('slug', $interests);
             })->with('category')->get();
 
-            $availableCulinaries = Culinary::whereHas('category', function ($query) {
-                $query->where('slug', 'kuliner');
-            })->get();
+            // Jika tidak ada yang cocok dengan interest, ambil 15 destinasi acak sebagai cadangan
+            if ($availableDestinations->isEmpty()) {
+                $availableDestinations = Destination::limit(15)->get();
+            }
 
-            // Try to get AI recommendations from DeepSeek
-            $aiPlan = $this->callDeepSeekAI($budget, $interests, $duration, $availableDestinations, $availableCulinaries);
+            // Ambil semua data kuliner yang tersedia
+            $availableCulinaries = Culinary::get();
 
             $generatedItems = [];
+            $budgetPerDay = $budget / $duration;
+            $destinationBudget = $budgetPerDay * 0.6; // Alokasi 60% budget harian untuk tiket wisata
 
-            if ($aiPlan && is_array($aiPlan)) {
-                // Use AI-generated plan
-                \Log::info('Using DeepSeek AI generated plan');
-                
-                foreach ($aiPlan as $planItem) {
-                    if (!isset($planItem['day'], $planItem['type'], $planItem['id'])) {
-                        continue;
-                    }
+            // Looping menyusun itinerary per hari
+            for ($day = 1; $day <= $duration; $day++) {
+                $order = 1;
 
-                    $plannableClass = $planItem['type'] === 'destination' ? Destination::class : Culinary::class;
-                    $plannable = $plannableClass::find($planItem['id']);
+                // 1. PAGI: Destinasi Wisata
+                $morningDestination = $availableDestinations
+                    ->where('price', '<=', $destinationBudget)
+                    ->whereNotIn('id', collect($generatedItems)->where('plannable_type', Destination::class)->pluck('plannable_id'))
+                    ->shuffle()->first();
 
-                    if (!$plannable) {
-                        continue;
-                    }
+                if (!$morningDestination && $availableDestinations->isNotEmpty()) {
+                    $morningDestination = $availableDestinations->shuffle()->first();
+                }
 
-                    $item = TripPlanItem::create([
+                if ($morningDestination) {
+                    $generatedItems[] = TripPlanItem::create([
                         'trip_plan_id' => $id,
-                        'plannable_type' => $plannableClass,
-                        'plannable_id' => $planItem['id'],
-                        'day_number' => $planItem['day'],
-                        'time' => $planItem['time'] ?? null,
-                        'order' => count(array_filter($generatedItems, fn($i) => $i->day_number === $planItem['day'])) + 1,
-                        'notes' => $planItem['notes'] ?? null,
+                        'plannable_type' => Destination::class,
+                        'plannable_id' => $morningDestination->id,
+                        'day_number' => $day,
+                        'time' => '09:00',
+                        'order' => $order++,
+                        'notes' => 'Destinasi pagi - ' . $morningDestination->name,
                     ]);
+                }
 
-                    $generatedItems[] = $item;
+                // 2. SIANG: Tempat Kuliner / Rumah Makan
+                $lunchCulinary = $availableCulinaries
+                    ->whereNotIn('id', collect($generatedItems)->where('plannable_type', Culinary::class)->pluck('plannable_id'))
+                    ->shuffle()->first();
+
+                if (!$lunchCulinary && $availableCulinaries->isNotEmpty()) {
+                    $lunchCulinary = $availableCulinaries->shuffle()->first();
+                }
+
+                if ($lunchCulinary) {
+                    $generatedItems[] = TripPlanItem::create([
+                        'trip_plan_id' => $id,
+                        'plannable_type' => Culinary::class,
+                        'plannable_id' => $lunchCulinary->id,
+                        'day_number' => $day,
+                        'time' => '12:00',
+                        'order' => $order++,
+                        'notes' => 'Makan siang - ' . $lunchCulinary->name,
+                    ]);
+                }
+
+                // 3. SORE: Destinasi Wisata Kedua
+                $afternoonDestination = $availableDestinations
+                    ->where('price', '<=', $destinationBudget)
+                    ->whereNotIn('id', collect($generatedItems)->where('plannable_type', Destination::class)->pluck('plannable_id'))
+                    ->shuffle()->first();
+
+                if (!$afternoonDestination && $availableDestinations->isNotEmpty()) {
+                    $afternoonDestination = $availableDestinations->shuffle()->first();
+                }
+
+                if ($afternoonDestination) {
+                    $generatedItems[] = TripPlanItem::create([
+                        'trip_plan_id' => $id,
+                        'plannable_type' => Destination::class,
+                        'plannable_id' => $afternoonDestination->id,
+                        'day_number' => $day,
+                        'time' => '14:00',
+                        'order' => $order++,
+                        'notes' => 'Destinasi sore - ' . $afternoonDestination->name,
+                    ]);
+                }
+
+                // 4. MALAM: Tempat Kuliner Malam
+                $dinnerCulinary = $availableCulinaries
+                    ->whereNotIn('id', collect($generatedItems)->where('plannable_type', Culinary::class)->pluck('plannable_id'))
+                    ->shuffle()->first();
+
+                if (!$dinnerCulinary && $availableCulinaries->isNotEmpty()) {
+                    $dinnerCulinary = $availableCulinaries->shuffle()->first();
+                }
+
+                if ($dinnerCulinary) {
+                    $generatedItems[] = TripPlanItem::create([
+                        'trip_plan_id' => $id,
+                        'plannable_type' => Culinary::class,
+                        'plannable_id' => $dinnerCulinary->id,
+                        'day_number' => $day,
+                        'time' => '18:00',
+                        'order' => $order++,
+                        'notes' => 'Makan malam - ' . $dinnerCulinary->name,
+                    ]);
                 }
             }
 
-            // Fallback to rule-based algorithm if AI fails or returns insufficient items
-            if (count($generatedItems) < $duration * 2) {
-                \Log::info('Using fallback rule-based algorithm');
-                
-                // Clear AI items if any
-                $tripPlan->items()->delete();
-                $generatedItems = [];
-
-                // Budget allocation per day
-                $budgetPerDay = $budget / $duration;
-                
-                // Allocate budget: 60% destinations, 40% culinaries
-                $destinationBudget = $budgetPerDay * 0.6;
-                $culinaryBudget = $budgetPerDay * 0.4;
-
-                for ($day = 1; $day <= $duration; $day++) {
-                    $order = 1;
-
-                    // Morning: Destination (09:00)
-                    $morningDestination = $availableDestinations
-                        ->where('price', '<=', $destinationBudget)
-                        ->whereNotIn('id', collect($generatedItems)->pluck('plannable_id'))
-                        ->random(1)
-                        ->first();
-
-                    if (!$morningDestination) {
-                        $morningDestination = $availableDestinations->random(1)->first();
-                    }
-
-                    if ($morningDestination) {
-                        $item = TripPlanItem::create([
-                            'trip_plan_id' => $id,
-                            'plannable_type' => Destination::class,
-                            'plannable_id' => $morningDestination->id,
-                            'day_number' => $day,
-                            'time' => '09:00',
-                            'order' => $order++,
-                            'notes' => 'Destinasi pagi - ' . $morningDestination->name,
-                        ]);
-                        $generatedItems[] = $item;
-                    }
-
-                    // Lunch: Culinary (12:00)
-                    $lunchCulinary = $availableCulinaries
-                        ->whereNotIn('id', collect($generatedItems)->where('plannable_type', Culinary::class)->pluck('plannable_id'))
-                        ->random(1)
-                        ->first();
-
-                    if ($lunchCulinary) {
-                        $item = TripPlanItem::create([
-                            'trip_plan_id' => $id,
-                            'plannable_type' => Culinary::class,
-                            'plannable_id' => $lunchCulinary->id,
-                            'day_number' => $day,
-                            'time' => '12:00',
-                            'order' => $order++,
-                            'notes' => 'Makan siang - ' . $lunchCulinary->name,
-                        ]);
-                        $generatedItems[] = $item;
-                    }
-
-                    // Afternoon: Destination (14:00)
-                    $afternoonDestination = $availableDestinations
-                        ->where('price', '<=', $destinationBudget)
-                        ->whereNotIn('id', collect($generatedItems)->pluck('plannable_id'))
-                        ->random(1)
-                        ->first();
-
-                    if (!$afternoonDestination) {
-                        $afternoonDestination = $availableDestinations
-                            ->whereNotIn('id', collect($generatedItems)->pluck('plannable_id'))
-                            ->random(1)
-                            ->first();
-                    }
-
-                    if ($afternoonDestination) {
-                        $item = TripPlanItem::create([
-                            'trip_plan_id' => $id,
-                            'plannable_type' => Destination::class,
-                            'plannable_id' => $afternoonDestination->id,
-                            'day_number' => $day,
-                            'time' => '14:00',
-                            'order' => $order++,
-                            'notes' => 'Destinasi sore - ' . $afternoonDestination->name,
-                        ]);
-                        $generatedItems[] = $item;
-                    }
-
-                    // Dinner: Culinary (18:00)
-                    $dinnerCulinary = $availableCulinaries
-                        ->whereNotIn('id', collect($generatedItems)->where('plannable_type', Culinary::class)->pluck('plannable_id'))
-                        ->random(1)
-                        ->first();
-
-                    if ($dinnerCulinary) {
-                        $item = TripPlanItem::create([
-                            'trip_plan_id' => $id,
-                            'plannable_type' => Culinary::class,
-                            'plannable_id' => $dinnerCulinary->id,
-                            'day_number' => $day,
-                            'time' => '18:00',
-                            'order' => $order++,
-                            'notes' => 'Makan malam - ' . $dinnerCulinary->name,
-                        ]);
-                        $generatedItems[] = $item;
-                    }
-                }
-            }
-
-            // Calculate estimated total cost
+            // Hitung perkiraan total biaya berdasarkan item yang didapat
             $estimatedCost = 0;
             foreach ($generatedItems as $item) {
                 $plannable = $item->plannable;
                 if ($plannable instanceof Destination && $plannable->price) {
                     $estimatedCost += $plannable->price;
                 } elseif ($plannable instanceof Culinary && $plannable->price_range) {
-                    // Get average price from range
                     preg_match_all('/\d+/', $plannable->price_range, $matches);
                     if (count($matches[0]) >= 2) {
                         $avgPrice = (intval($matches[0][0]) + intval($matches[0][1])) / 2;
@@ -663,17 +617,19 @@ class TripPlanController extends Controller
                 }
             }
 
+            $tripPlan->update(['status' => 'active']);
+
             return response()->json([
                 'success' => true,
-                'message' => 'AI trip plan generated successfully',
+                'message' => 'Trip plan generated successfully using local algorithm',
                 'data' => [
                     'total_items' => count($generatedItems),
                     'total_days' => $duration,
-                    'items_per_day' => count($generatedItems) / $duration,
+                    'items_per_day' => $duration > 0 ? count($generatedItems) / $duration : 0,
                     'estimated_cost' => round($estimatedCost),
                     'budget' => $budget,
                     'budget_remaining' => max(0, $budget - $estimatedCost),
-                    'ai_powered' => $aiPlan !== null,
+                    'ai_powered' => false,
                 ],
                 'errors' => null,
             ], 200);
@@ -688,7 +644,7 @@ class TripPlanController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to generate AI plan',
+                'message' => 'Failed to generate plan',
                 'data' => null,
                 'errors' => ['server' => [$e->getMessage()]],
             ], 500);

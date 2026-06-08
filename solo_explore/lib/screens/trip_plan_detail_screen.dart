@@ -248,6 +248,180 @@ class _TripPlanDetailScreenState extends State<TripPlanDetailScreen> {
     }
   }
 
+  Future<void> _showGeneratePlanDialog() async {
+    final budgetController = TextEditingController();
+    int duration = 3; // Default 3 hari
+    List<String> selectedInterests = [];
+    bool isGenerating = false;
+
+    // Daftar kategori contoh yang ada di database Solo Explore-mu
+    final availableInterests = [
+      {'slug': 'wisata-alam', 'name': 'Wisata Alam'},
+      {'slug': 'sejarah-budaya', 'name': 'Sejarah & Budaya'},
+      {'slug': 'kuliner', 'name': 'Kuliner'},
+      {'slug': 'rekreasi', 'name': 'Rekreasi Modern'},
+    ];
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(
+            'Rekomendasi Rute Otomatis',
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+          ),
+          content: isGenerating
+              ? const SizedBox(
+                  height: 150,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('Menyusun rute terbaik...'),
+                      ],
+                    ),
+                  ),
+                )
+              : SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: budgetController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Maksimal Budget (Rp)',
+                          hintText: 'Contoh: 500000',
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Durasi Perjalanan: $duration Hari',
+                        style: GoogleFonts.beVietnamPro(fontSize: 14),
+                      ),
+                      Slider(
+                        value: duration.toDouble(),
+                        min: 1,
+                        max: 7,
+                        divisions: 6,
+                        label: '$duration Hari',
+                        onChanged: (value) {
+                          setDialogState(() => duration = value.toInt());
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Pilih Ketertarikan:',
+                        style: GoogleFonts.beVietnamPro(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: availableInterests.map((interest) {
+                          final isSelected = selectedInterests.contains(
+                            interest['slug'],
+                          );
+                          return FilterChip(
+                            label: Text(interest['name']!),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setDialogState(() {
+                                if (selected) {
+                                  selectedInterests.add(interest['slug']!);
+                                } else {
+                                  selectedInterests.remove(interest['slug']);
+                                }
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+          actions: isGenerating
+              ? []
+              : [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Batal'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (budgetController.text.isEmpty ||
+                          selectedInterests.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Budget dan ketertarikan wajib diisi!',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() => isGenerating = true);
+
+                      // 💡 TRICK: Simpan navigator & messenger ke variabel SEBELUM async gap (await)
+                      final navigator = Navigator.of(context);
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+                      try {
+                        final response = await _apiService
+                            .generateTripPlan(widget.planId, {
+                              'budget': num.parse(budgetController.text),
+                              'interests': selectedInterests,
+                              'duration': duration,
+                            });
+
+                        // 🛡️ Cek apakah halaman utama masih ada di screen
+                        if (!mounted) return;
+
+                        navigator
+                            .pop(); // Tutup dialog menggunakan variabel navigator yang aman
+
+                        if (response['success']) {
+                          scaffoldMessenger.showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Itinerary berhasil dibuat otomatis!',
+                              ),
+                            ),
+                          );
+                          _loadPlanDetail(); // Refresh data halaman detail
+                        } else {
+                          scaffoldMessenger.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                response['message'] ?? 'Gagal membuat rute',
+                              ),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (!mounted) return;
+
+                        navigator.pop(); // Tutup dialog jika error
+                        scaffoldMessenger.showSnackBar(
+                          SnackBar(content: Text('Terjadi kesalahan: $e')),
+                        );
+                      }
+                    },
+                    child: const Text('Mulai Susun'),
+                  ),
+                ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -399,6 +573,23 @@ class _TripPlanDetailScreenState extends State<TripPlanDetailScreen> {
                       style: GoogleFonts.beVietnamPro(
                         fontSize: 12,
                         color: AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: _showGeneratePlanDialog,
+                      icon: const Icon(Icons.auto_awesome),
+                      label: const Text('Generate Rute Otomatis'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ],

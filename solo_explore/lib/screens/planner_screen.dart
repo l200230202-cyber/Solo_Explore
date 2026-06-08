@@ -161,7 +161,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
                   return;
                 }
 
+                // Langsung pop context dialog sebelum memproses async method
                 Navigator.pop(context);
+
                 await _createPlan(
                   nameController.text,
                   descController.text,
@@ -269,6 +271,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
   Future<void> _generateAIPlan() async {
     final budgetController = TextEditingController();
     String selectedInterest = 'budaya';
+    int selectedDuration = 1;
 
     await showDialog(
       context: context,
@@ -297,10 +300,28 @@ class _PlannerScreenState extends State<PlannerScreen> {
                   keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: 16),
+                // ✅ MEMAKAI initialValue (Bukan value)
+                DropdownButtonFormField<int>(
+                  initialValue: selectedDuration,
+                  decoration: const InputDecoration(
+                    labelText: 'Durasi Perjalanan',
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 1, child: Text('1 Hari')),
+                    DropdownMenuItem(value: 2, child: Text('2 Hari')),
+                    DropdownMenuItem(value: 3, child: Text('3 Hari')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setDialogState(() => selectedDuration = value);
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                // ✅ MEMAKAI initialValue (Bukan value)
                 DropdownButtonFormField<String>(
-                  // ✅ PERBAIKAN: Menggunakan initialValue menggantikan value yang deprecated
                   initialValue: selectedInterest,
-                  decoration: const InputDecoration(labelText: 'Minat'),
+                  decoration: const InputDecoration(labelText: 'Minat Utama'),
                   items: const [
                     DropdownMenuItem(value: 'budaya', child: Text('Budaya')),
                     DropdownMenuItem(value: 'kuliner', child: Text('Kuliner')),
@@ -323,10 +344,17 @@ class _PlannerScreenState extends State<PlannerScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
+                if (budgetController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Budget harus diisi')),
+                  );
+                  return;
+                }
                 Navigator.pop(context);
                 await _performGenerateAI(
                   budgetController.text,
                   selectedInterest,
+                  selectedDuration,
                 );
               },
               child: const Text('Generate'),
@@ -337,7 +365,11 @@ class _PlannerScreenState extends State<PlannerScreen> {
     );
   }
 
-  Future<void> _performGenerateAI(String budget, String interest) async {
+  Future<void> _performGenerateAI(
+    String budget,
+    String interest,
+    int duration,
+  ) async {
     try {
       showDialog(
         context: context,
@@ -351,28 +383,29 @@ class _PlannerScreenState extends State<PlannerScreen> {
         description:
             'Rencana perjalanan yang dibuat oleh AI berdasarkan budget dan minat Anda',
         startDate: now,
-        endDate: now.add(const Duration(days: 3)),
+        endDate: now.add(Duration(days: duration - 1)),
       );
 
-      // ✅ PERBAIKAN: Menghapus createResponse != null dan ganti ?[ menjadi [
+      // ✅ PERBAIKAN: Menggunakan !mounted (State-level check) dan dibungkus kurung kurawal {}
+      if (!mounted) {
+        return;
+      }
+
       if ((createResponse['success'] ?? false) == false) {
-        if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                createResponse['message'] ?? 'Gagal membuat rencana wadah AI',
-              ),
+        Navigator.pop(context); // Tutup loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              createResponse['message'] ?? 'Gagal membuat rencana wadah AI',
             ),
-          );
-        }
+          ),
+        );
         return;
       }
 
       final planId = createResponse['data']['id'];
       final budgetValue = double.tryParse(budget) ?? 500000.0;
       final interestsList = [interest];
-      final duration = 3;
 
       final response = await _apiService.generateAIPlan(
         planId: planId,
@@ -381,30 +414,35 @@ class _PlannerScreenState extends State<PlannerScreen> {
         duration: duration,
       );
 
-      if (mounted) {
-        Navigator.pop(context); // Tutup loading dialog
+      // ✅ PERBAIKAN: Menggunakan !mounted sebelum memanggil Navigator/ScaffoldMessenger setelah await kedua
+      if (!mounted) {
+        return;
+      }
 
-        // ✅ PERBAIKAN: Menghapus response != null dan ganti ?[ menjadi [
-        if ((response['success'] ?? false) == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Rencana AI berhasil dibuat')),
-          );
-          _loadTripPlans();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response['message'] ?? 'Gagal generate rencana'),
-            ),
-          );
-        }
+      Navigator.pop(context); // Tutup loading dialog
+
+      if ((response['success'] ?? false) == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Rencana AI berhasil dibuat')),
+        );
+        _loadTripPlans();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response['message'] ?? 'Gagal generate rencana'),
+          ),
+        );
       }
     } catch (e) {
-      if (mounted) {
-        Navigator.pop(context); // Tutup loading dialog
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Terjadi kesalahan: $e')));
+      // ✅ PERBAIKAN: Menggunakan !mounted di dalam catch block sebelum memanggil context
+      if (!mounted) {
+        return;
       }
+
+      Navigator.pop(context); // Tutup loading dialog
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Terjadi kesalahan: $e')));
     }
   }
 
