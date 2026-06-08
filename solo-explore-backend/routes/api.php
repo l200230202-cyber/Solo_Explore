@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\ImageProxyController;
 // Public routes
 Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
+    Route::post('register-mitra', [AuthController::class, 'registerMitra']); // 🟢 BARIS BARU
     Route::post('login', [AuthController::class, 'login']);
     
     // Social Login (Mobile - Token based)
@@ -45,10 +46,9 @@ Route::prefix('password')->group(function () {
 });
 
 // Public data routes
-    // Recommendations
+// Recommendations
 Route::get('/destinations/recommendations', [DestinationController::class, 'recommendations']);
 Route::get('/culinaries/recommendations', [CulinaryController::class, 'recommendations']);
-Route::get('/destinations/nearby', [DestinationController::class, 'getNearby']);
 
 Route::get('categories', [CategoryController::class, 'index']);
 Route::get('destinations', [DestinationController::class, 'index']);

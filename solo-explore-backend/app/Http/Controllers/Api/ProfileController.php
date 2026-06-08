@@ -153,8 +153,8 @@ public function show()
         }
     }
 
-   /**
-     * Get user statistics & visit history
+    /**
+     * Get user statistics
      * GET /api/profile/stats
      */
     public function stats()
@@ -193,23 +193,6 @@ public function show()
                 ? round(($user->points / $nextLevelPoints) * 100, 2)
                 : 100;
 
-            // 🛠️ AMBIL DATA RIWAYAT KUNJUNGAN TERBARU BESERTA DESTINASINYA
-            $visitsHistory = $user->visits()
-                ->with('visitable') // Mengambil data polimorfik (Destination/Culinary/Event)
-                ->orderBy('created_at', 'desc')
-                ->take(10) // Batasi ambil 10 riwayat terakhir untuk performa
-                ->get()
-                ->map(function ($visit) {
-                    return [
-                        'id' => $visit->id,
-                        'name' => $visit->visitable->name ?? 'Tempat Wisata',
-                        'image' => $visit->visitable->image ?? null, // URL gambar dari model destinasi
-                        'type' => str_replace('App\Models\\', '', $visit->visitable_type), // Menghasilkan 'Destination', 'Culinary', dll.
-                        'points_earned' => $visit->points_earned,
-                        'visited_at' => Carbon::parse($visit->created_at)->translatedFormat('d F Y'), // Format: "08 Juni 2026"
-                    ];
-                });
-
             return response()->json([
                 'success' => true,
                 'message' => 'Stats retrieved successfully',
@@ -227,7 +210,6 @@ public function show()
                     'total_rewards_claimed' => $user->rewards()->count(),
                     'next_level_points' => $nextLevelPoints,
                     'progress_to_next_level' => $progressToNextLevel,
-                    'visits_history' => $visitsHistory, // 👈 🛠️ Diselipkan di sini agar Flutter bisa baca
                 ],
                 'errors' => null,
             ], 200);

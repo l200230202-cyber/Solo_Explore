@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 class AuthController extends Controller
 {
     /**
-     * Register a new user
+     * Register a new user (Wisatawan)
      * POST /api/auth/register
      */
     public function register(Request $request)
@@ -84,6 +84,74 @@ class AuthController extends Controller
     }
 
     /**
+     * 🟢 Register a new Mitra (Diseragamkan menjadi admin_mitra)
+     * POST /api/auth/register-mitra
+     */
+    public function registerMitra(Request $request)
+    {
+        try {
+            // 1. Validasi input yang dikirim dari Flutter Web Mitra
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'nama_usaha' => 'required|string|max:255',
+                'email' => 'required|string|email|max:255|unique:users',
+                'password' => 'required|string|min:8',
+            ]);
+
+            // 2. Transaksi Database untuk menyimpan data Mitra
+            $result = DB::transaction(function () use ($validated) {
+                return User::create([
+                    'name' => $validated['name'],
+                    'nama_usaha' => $validated['nama_usaha'],
+                    'email' => $validated['email'],
+                    'password' => Hash::make($validated['password']),
+                    'role' => 'admin_mitra', // 🟢 DISERAGAMKAN JADI admin_mitra AGAR TEMBUS MIDDLEWARE WEB
+                    'status' => 'active',       // Status otomatis aktif
+                ]);
+            });
+
+            // 3. Generate Auth Token token bawaan Sanctum
+            $token = $result->createToken('auth_token')->plainTextToken;
+
+            // 4. Kembalikan format response JSON yang seragam dengan register biasa
+            return response()->json([
+                'success' => true,
+                'message' => 'Mitra registration successful',
+                'data' => [
+                    'user' => [
+                        'id' => $result->id,
+                        'name' => $result->name,
+                        'nama_usaha' => $result->nama_usaha,
+                        'email' => $result->email,
+                        'phone' => $result->phone,
+                        'avatar' => $result->avatar,
+                        'role' => $result->role,
+                        'status' => $result->status,
+                        'is_verified' => $result->is_verified,
+                    ],
+                    'token' => $token,
+                ],
+                'errors' => null,
+            ], 201);
+
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'data' => null,
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error Laravel: ' . $e->getMessage(),
+                'data' => null,
+                'errors' => ['server' => [$e->getMessage()]],
+            ], 500);
+        }
+    }
+
+    /**
      * Login user
      */
     public function login(Request $request)
@@ -124,6 +192,7 @@ class AuthController extends Controller
                         'points' => $user->points,
                         'total_destinations' => $user->total_destinations,
                         'is_verified' => $user->is_verified,
+                        'role' => $user->role,
                     ],
                     'token' => $token,
                 ],
@@ -195,7 +264,7 @@ class AuthController extends Controller
                     'points' => $user->points,
                     'total_destinations' => $user->total_destinations,
                     'is_verified' => $user->is_verified,
-                    'interests' => $user->interests, // Tampilkan minat saat panggil 'me'
+                    'interests' => $user->interests, 
                     'created_at' => $user->created_at->toISOString(),
                 ],
                 'errors' => null,
