@@ -527,9 +527,29 @@ class _DestinationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         if (slug != null) {
-          Navigator.pushNamed(context, '/destination', arguments: slug);
+          // 🛠️ 1. Simpan navigator ke variabel SEBELUM proses async (menghindari async gap warning)
+          final navigator = Navigator.of(context);
+
+          // 🛠️ 2. Tunggu proses pindah halaman sampai user menekan tombol 'back'
+          await navigator.pushNamed('/destination', arguments: slug);
+
+          // 🛠️ 3. Ambil state dari halaman induk (HomeScreenState) secara aman
+          if (context.mounted) {
+            final homeState = context.findAncestorStateOfType<State>();
+
+            if (homeState != null && homeState.mounted) {
+              // Panggil fungsi refresh di HomeScreen secara dinamis
+              try {
+                (homeState as dynamic)._loadData();
+              } catch (_) {
+                try {
+                  (homeState as dynamic)._fetchData();
+                } catch (_) {}
+              }
+            }
+          }
         }
       },
       child: Container(

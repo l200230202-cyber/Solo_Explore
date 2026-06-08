@@ -11,7 +11,7 @@ import '../models/event.dart';
 class ApiService {
   // Gunakan 10.0.2.2 untuk Android emulator, atau IP lokal komputer untuk device fisik
   // Contoh device fisik: 'http://192.168.1.x:8000/api'
-  static const String baseUrl = 'http://localhost:8000/api';
+  static const String baseUrl = 'http://192.168.0.3:8000/api';
   String? _token;
 
   Future<void> _loadToken() async {
@@ -29,6 +29,15 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     _token = null;
+  }
+
+  Future<bool> hasToken() async {
+    if (_token != null) return true; // Jika token sudah ter-load di memori
+
+    // Jika belum ter-load, coba ambil dari SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    _token = prefs.getString('auth_token');
+    return _token != null && _token!.isNotEmpty;
   }
 
   Map<String, String> _headers({bool needsAuth = false}) {
@@ -200,70 +209,108 @@ class ApiService {
     return [];
   }
 
+  // =========================================================================
   // Destinations
+  // =========================================================================
+
   Future<List<Destination>> getDestinations({
     String? category,
     bool? featured,
   }) async {
-    await _loadToken();
-    var url = '$baseUrl/destinations?per_page=100&';
-    if (category != null) url += 'category=$category&';
-    if (featured != null) url += 'featured=$featured&';
+    try {
+      await _loadToken();
+      var url = '$baseUrl/destinations?per_page=100&';
+      if (category != null) url += 'category=$category&';
+      if (featured != null) url += 'featured=$featured&';
 
-    final response = await http.get(
-      Uri.parse(url),
-      headers: _headers(needsAuth: _token != null),
-    );
-    final data = jsonDecode(response.body);
-    if (data['success']) {
-      final items = data['data']['data'] ?? data['data'];
-      return (items as List).map((e) => Destination.fromJson(e)).toList();
+      final response = await http.get(
+        Uri.parse(url),
+        headers: _headers(needsAuth: _token != null),
+      );
+
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        // ✅ FIXED: Menghindari linter warning & null crash
+        final items = data['data']['data'] ?? data['data'];
+        if (items is List) {
+          return items.map((e) => Destination.fromJson(e)).toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error getDestinations: $e');
+      return [];
     }
-    return [];
   }
 
   Future<Destination?> getDestinationDetail(String slug) async {
-    await _loadToken();
-    final response = await http.get(
-      Uri.parse('$baseUrl/destinations/$slug'),
-      headers: _headers(needsAuth: _token != null),
-    );
-    final data = jsonDecode(response.body);
-    if (data['success']) {
-      return Destination.fromJson(data['data']);
+    try {
+      await _loadToken();
+      final response = await http.get(
+        Uri.parse('$baseUrl/destinations/$slug'),
+        headers: _headers(needsAuth: _token != null),
+      );
+
+      final data = jsonDecode(response.body);
+      if (data['success'] == true && data['data'] != null) {
+        // ✅ FIXED: Pengaman data null
+        return Destination.fromJson(data['data']);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getDestinationDetail: $e');
+      return null;
     }
-    return null;
   }
 
+  // =========================================================================
   // Culinaries
-  Future<List<Culinary>> getCulinaries({bool? featured}) async {
-    await _loadToken();
-    var url = '$baseUrl/culinaries?per_page=100&';
-    if (featured != null) url += 'featured=$featured';
+  // =========================================================================
 
-    final response = await http.get(
-      Uri.parse(url),
-      headers: _headers(needsAuth: _token != null),
-    );
-    final data = jsonDecode(response.body);
-    if (data['success']) {
-      final items = data['data']['data'] ?? data['data'];
-      return (items as List).map((e) => Culinary.fromJson(e)).toList();
+  Future<List<Culinary>> getCulinaries({bool? featured}) async {
+    try {
+      await _loadToken();
+      var url = '$baseUrl/culinaries?per_page=100&';
+      if (featured != null) url += 'featured=$featured';
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: _headers(needsAuth: _token != null),
+      );
+
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        // ✅ FIXED: Menghindari linter warning
+        final items = data['data']['data'] ?? data['data'];
+        if (items is List) {
+          return items.map((e) => Culinary.fromJson(e)).toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error getCulinaries: $e');
+      return [];
     }
-    return [];
   }
 
   Future<Culinary?> getCulinaryDetail(String slug) async {
-    await _loadToken();
-    final response = await http.get(
-      Uri.parse('$baseUrl/culinaries/$slug'),
-      headers: _headers(needsAuth: _token != null),
-    );
-    final data = jsonDecode(response.body);
-    if (data['success']) {
-      return Culinary.fromJson(data['data']);
+    try {
+      await _loadToken();
+      final response = await http.get(
+        Uri.parse('$baseUrl/culinaries/$slug'),
+        headers: _headers(needsAuth: _token != null),
+      );
+
+      final data = jsonDecode(response.body);
+      if (data['success'] == true && data['data'] != null) {
+        // ✅ FIXED: Pengaman data null
+        return Culinary.fromJson(data['data']);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getCulinaryDetail: $e');
+      return null;
     }
-    return null;
   }
 
   Future<List<dynamic>> getPersonalizedRecommendations(
@@ -295,6 +342,7 @@ class ApiService {
       final data = jsonDecode(response.body);
 
       if (data['success'] == true) {
+        // ✅ FIXED: Menghindari linter warning
         final items = data['data']['data'] ?? data['data'];
 
         debugPrint(
@@ -322,35 +370,83 @@ class ApiService {
     return [];
   }
 
-  // Events
-  Future<List<Event>> getEvents({bool? upcoming}) async {
-    await _loadToken();
-    var url = '$baseUrl/events?';
-    if (upcoming != null) url += 'upcoming=$upcoming';
+  // =========================================================================
+  // Events (Versi Aman & Stabil)
+  // =========================================================================
 
-    final response = await http.get(
-      Uri.parse(url),
-      headers: _headers(needsAuth: _token != null),
-    );
-    final data = jsonDecode(response.body);
-    if (data['success']) {
-      final items = data['data']['data'] ?? data['data'];
-      return (items as List).map((e) => Event.fromJson(e)).toList();
+  Future<List<Event>> getEvents({bool? upcoming}) async {
+    try {
+      await _loadToken();
+      var url = '$baseUrl/events?';
+      if (upcoming != null) url += 'upcoming=$upcoming';
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: _headers(needsAuth: _token != null),
+      );
+
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        // ✅ FIXED: Eksplisit boolean untuk linter
+        final items = data['data']['data'] ?? data['data'];
+        if (items is List) {
+          // ✅ FIXED: Pengaman tipe data list
+          return items.map((e) => Event.fromJson(e)).toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      // ✅ FIXED: Menahan crash jika network/server bermasalah
+      debugPrint("Error getEvents: $e");
+      return [];
     }
-    return [];
   }
 
   Future<Event?> getEventDetail(String slug) async {
-    await _loadToken();
-    final response = await http.get(
-      Uri.parse('$baseUrl/events/$slug'),
-      headers: _headers(needsAuth: _token != null),
-    );
-    final data = jsonDecode(response.body);
-    if (data['success']) {
-      return Event.fromJson(data['data']);
+    try {
+      await _loadToken();
+      final response = await http.get(
+        Uri.parse('$baseUrl/events/$slug'),
+        headers: _headers(needsAuth: _token != null),
+      );
+
+      final data = jsonDecode(response.body);
+      if (data['success'] == true && data['data'] != null) {
+        // ✅ FIXED: Pengaman null data
+        return Event.fromJson(data['data']);
+      }
+      return null;
+    } catch (e) {
+      // ✅ FIXED: Menahan crash jika internet mati
+      debugPrint("Error getEventDetail: $e");
+      return null;
     }
-    return null;
+  }
+
+  Future<List<Event>> getEventsByMonth({
+    required int year,
+    required int month,
+  }) async {
+    try {
+      await _loadToken();
+      final response = await http.get(
+        Uri.parse('$baseUrl/events/month/$year/$month'),
+        headers: _headers(needsAuth: _token != null),
+      );
+
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        // ✅ FIXED: Eksplisit boolean
+        final items = data['data'];
+        if (items is List) {
+          return items.map((e) => Event.fromJson(e)).toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      debugPrint("Error parsing di getEventsByMonth: $e");
+      return [];
+    }
   }
 
   // Bookmarks
@@ -377,28 +473,41 @@ class ApiService {
     return [];
   }
 
-  // Search
+  // =========================================================================
+  // Search (Versi Aman & Stabil untuk Guest)
+  // =========================================================================
+
   Future<Map<String, dynamic>> search(String query) async {
-    await _loadToken();
-    final response = await http.get(
-      Uri.parse('$baseUrl/search?q=$query'),
-      headers: _headers(needsAuth: _token != null),
-    );
-    final data = jsonDecode(response.body);
-    if (data['success']) {
-      return {
-        'destinations': (data['data']['destinations'] as List)
-            .map((e) => Destination.fromJson(e))
-            .toList(),
-        'culinaries': (data['data']['culinaries'] as List)
-            .map((e) => Culinary.fromJson(e))
-            .toList(),
-        'events': (data['data']['events'] as List)
-            .map((e) => Event.fromJson(e))
-            .toList(),
-      };
+    try {
+      await _loadToken();
+      final response = await http.get(
+        Uri.parse('$baseUrl/search?q=$query'),
+        headers: _headers(needsAuth: _token != null),
+      );
+
+      final data = jsonDecode(response.body);
+
+      // ✅ PERBAIKAN: Cek eksplisit boolean dan pastikan data['data'] tidak null
+      if (data['success'] == true && data['data'] != null) {
+        return {
+          // ✅ PERBAIKAN: Gunakan '?? []' dan 'as List' yang aman agar tidak null crash
+          'destinations': ((data['data']['destinations'] ?? []) as List)
+              .map((e) => Destination.fromJson(e))
+              .toList(),
+          'culinaries': ((data['data']['culinaries'] ?? []) as List)
+              .map((e) => Culinary.fromJson(e))
+              .toList(),
+          'events': ((data['data']['events'] ?? []) as List)
+              .map((e) => Event.fromJson(e))
+              .toList(),
+        };
+      }
+      return {'destinations': [], 'culinaries': [], 'events': []};
+    } catch (e) {
+      // ✅ PERBAIKAN: Menahan crash jika internet putus, tetap return map kosong agar UI aman
+      debugPrint('Error pada Fitur Search: $e');
+      return {'destinations': [], 'culinaries': [], 'events': []};
     }
-    return {'destinations': [], 'culinaries': [], 'events': []};
   }
 
   // Reviews

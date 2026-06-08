@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../core/theme.dart';
 import '../services/api_service.dart';
 import '../core/app_router.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -14,10 +15,38 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _profile;
   Map<String, dynamic>? _stats;
-  List<Map<String, dynamic>> _myBadges = [];
-  List<Map<String, dynamic>> _availableRewards = [];
-  List<Map<String, dynamic>> _visits = [];
+
   bool _isLoading = true;
+  bool _isPublicMode = false;
+
+  // 🛠️ PERBAIKAN: Ambil level dari data _stats (mengikuti struktur Laravel stats)
+  int get userLevel {
+    return int.tryParse(_stats?['level']?.toString() ?? '1') ?? 1;
+  }
+
+  String get userName {
+    return _profile?['name']?.toString() ?? 'Pengguna';
+  }
+
+  // 🛠️ PERBAIKAN: Ambil total poin dari data _stats
+  int get userPoints {
+    return int.tryParse(_stats?['points']?.toString() ?? '0') ?? 0;
+  }
+
+  // 🛠️ PERBAIKAN: Ambil total destinasi dari data _stats
+  String get totalDestinations {
+    return _stats?['total_destinations']?.toString() ?? '0';
+  }
+
+  // 🛠️ TAMBAHAN: Mengambil gelar level langsung dari database Laravel jika ada
+  String get levelTitle {
+    return _stats?['level_title']?.toString() ?? _getLevelName(userLevel);
+  }
+
+  // 🛠️ TAMBAHAN: Mengambil list riwayat kunjungan dari objek _stats
+  List<dynamic> get visitsHistory {
+    return _stats?['visits_history'] as List<dynamic>? ?? [];
+  }
 
   @override
   void initState() {
@@ -25,31 +54,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadData();
   }
 
-  Future<void> _loadData() async {
+  // 2. PERBARUI FUNGSI LOAD DATA DENGAN CEK TOKEN
+Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
+      // Cek status login via ApiService
+      final bool isLoggedIn = await ApiService().hasToken();
+
+      if (!isLoggedIn) {
+        if (mounted) {
+          setState(() {
+            _isPublicMode = true;
+            _isLoading = false;
+          });
+        }
+        return; // Stop di sini jika user adalah Guest/Tamu
+      }
+
+      // 🛠️ PANGGIL PARALEL: Hanya profile dan stats saja dari Laravel
       final profile = await ApiService().getProfile();
       final stats = await ApiService().getStats();
-      final badges = await ApiService().getMyBadges();
-      final rewards = await ApiService().getAvailableRewards();
-      final visits = await ApiService().getVisits();
+
+      // Baris ApiService().getVisits() Dihapus dari sini 🗑️
 
       if (mounted) {
         setState(() {
           _profile = profile;
           _stats = stats;
-          _myBadges = badges;
-          _availableRewards = rewards;
-          _visits = visits;
+          // Baris _visits = ... Dihapus dari sini 🗑️
+          _isPublicMode = false;
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading profile: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading profile: $e')));
       }
     }
   }
@@ -58,13 +100,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_profile == null) return;
 
     final nameController = TextEditingController(text: _profile!['name']);
-    final phoneController = TextEditingController(text: _profile!['phone'] ?? '');
+    final phoneController = TextEditingController(
+      text: _profile!['phone'] ?? '',
+    );
     final bioController = TextEditingController(text: _profile!['bio'] ?? '');
 
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Edit Profile', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700)),
+        title: Text(
+          'Edit Profile',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -124,17 +171,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (result == true) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile berhasil diupdate'), backgroundColor: Colors.green),
-      );
-      _loadData();
-    }
-  }
-
-  Future<void> _claimReward(int id, String name) async {
-    final success = await ApiService().claimReward(id);
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$name berhasil diklaim!'), backgroundColor: Colors.green),
+        const SnackBar(
+          content: Text('Profile berhasil diupdate'),
+          backgroundColor: Colors.green,
+        ),
       );
       _loadData();
     }
@@ -148,97 +188,163 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return 'Beginner Explorer';
   }
 
-  String _formatDate(String? dateStr) {
-    if (dateStr == null) return '';
-    try {
-      final date = DateTime.parse(dateStr);
-      return '${date.day} ${_getMonthName(date.month)} ${date.year}';
-    } catch (e) {
-      return dateStr;
-    }
-  }
-
-  String _getMonthName(int month) {
-    const months = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
-                    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-    return months[month];
-  }
-
-  IconData _getBadgeIcon(String iconName) {
-    switch (iconName) {
-      case 'temple': return Icons.temple_buddhist;
-      case 'restaurant': return Icons.restaurant;
-      case 'camera': return Icons.camera_alt;
-      case 'hiking': return Icons.hiking;
-      case 'star': return Icons.star;
-      case 'trophy': return Icons.emoji_events;
-      default: return Icons.workspace_premium;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    // 1. Jika masih loading, tampilkan indikator loading
     if (_isLoading) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        backgroundColor: AppColors.surface,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
       );
     }
 
-    final userName = _profile?['name'] ?? 'User';
-    final userLevel = _profile?['level'] ?? 1;
-    final userPoints = _stats?['points'] ?? 0;
-    final totalDestinations = _stats?['total_destinations'] ?? 0;
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            floating: true,
-            backgroundColor: const Color(0xFFF5FAF0).withValues(alpha: 0.9),
-            elevation: 0,
-            title: Text(
-              'SoloExplore',
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: AppColors.primary),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.edit, color: AppColors.primary),
-                onPressed: _showEditProfileDialog,
-              ),
-              IconButton(
-                icon: const Icon(Icons.logout, color: AppColors.primary),
-                onPressed: () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: Text('Logout', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700)),
-                      content: Text('Apakah Anda yakin ingin keluar?', style: GoogleFonts.beVietnamPro()),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: Text('Batal', style: GoogleFonts.beVietnamPro()),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                          child: Text('Logout', style: GoogleFonts.beVietnamPro()),
-                        ),
-                      ],
+    // 2. JIKA MODE PUBLIC (TAMU / BELUM LOGIN)
+    if (_isPublicMode) {
+      return Scaffold(
+        backgroundColor: AppColors.surface,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.account_circle_outlined,
+                  size: 80,
+                  color: AppColors.outline,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Yuk, Masuk Akun dulu!',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Masuk untuk melihat riwayat kunjungan, mengoleksi badges, dan menukarkan poin menarik.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.beVietnamPro(
+                    fontSize: 14,
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 12,
                     ),
-                  );
-                  
-                  if (confirm == true && context.mounted) {
-                    await ApiService().logout();
-                    if (context.mounted) {
-                      Navigator.pushNamedAndRemoveUntil(context, AppRouter.login, (route) => false);
-                    }
-                  }
-                },
-              ),
-              const SizedBox(width: 16),
-            ],
+                  ),
+                  onPressed: () {
+                    // Berpindah ke halaman login
+                    Navigator.pushNamed(context, AppRouter.login);
+                  },
+                  child: Text(
+                    'Login Sekarang',
+                    style: GoogleFonts.beVietnamPro(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
+        ),
+      );
+    }
+    
+
+    return VisibilityDetector(
+      key: const Key('profile_screen_key'),
+      onVisibilityChanged: (visibilityInfo) {
+        // Jika halaman profil aktif/terlihat penuh di layar HP
+        if (visibilityInfo.visibleFraction == 1.0) {
+          _loadData(); // 🔄 Jalankan auto-refresh ke backend Laravel
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              floating: true,
+              backgroundColor: const Color(0xFFF5FAF0).withValues(alpha: 0.9),
+              elevation: 0,
+              title: Text(
+                'SoloExplore',
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+              actions: [
+                // 🛠️ TOMBOL EDIT PROFIL
+                IconButton(
+                  icon: const Icon(Icons.edit, color: AppColors.primary),
+                  onPressed: _showEditProfileDialog,
+                ),
+                // 🛠️ TOMBOL LOGOUT (SUDAH DIGABUNG KEMBALI)
+                IconButton(
+                  icon: const Icon(Icons.logout, color: AppColors.primary),
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text(
+                          'Logout',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        content: Text(
+                          'Apakah Anda yakin ingin keluar?',
+                          style: GoogleFonts.beVietnamPro(),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: Text(
+                              'Batal',
+                              style: GoogleFonts.beVietnamPro(),
+                            ),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                            ),
+                            child: Text(
+                              'Logout',
+                              style: GoogleFonts.beVietnamPro(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirm == true && context.mounted) {
+                      await ApiService().logout();
+                      if (context.mounted) {
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          AppRouter.login,
+                          (route) => false,
+                        );
+                      }
+                    }
+                  },
+                ),
+                const SizedBox(width: 16),
+              ],
+            ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
@@ -266,7 +372,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   width: 80,
                                   height: 80,
                                   color: AppColors.surfaceContainer,
-                                  child: const Icon(Icons.person, size: 40, color: AppColors.outline),
+                                  child: const Icon(
+                                    Icons.person,
+                                    size: 40,
+                                    color: AppColors.outline,
+                                  ),
                                 ),
                               ),
                             ),
@@ -279,9 +389,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 decoration: BoxDecoration(
                                   color: AppColors.secondary,
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 2),
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
                                 ),
-                                child: const Icon(Icons.verified, color: Colors.white, size: 14),
+                                child: const Icon(
+                                  Icons.verified,
+                                  color: Colors.white,
+                                  size: 14,
+                                ),
                               ),
                             ),
                           ],
@@ -310,7 +427,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               Row(
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: AppColors.secondaryContainer,
                                       borderRadius: BorderRadius.circular(100),
@@ -348,7 +468,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: _StatCard(
                           label: 'Total Points',
                           value: '$userPoints',
-                          sub: '+${_stats?['points_this_month'] ?? 0} this month',
+                          sub:
+                              '+${_stats?['points_this_month'] ?? 0} this month',
                           subIcon: Icons.trending_up,
                         ),
                       ),
@@ -356,142 +477,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Expanded(
                         child: _StatCard(
                           label: 'Destinations',
-                          value: '$totalDestinations',
+                          value: totalDestinations,
                           sub: 'Surakarta & Solo Raya',
                           subIcon: Icons.location_on,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  // Reward milestone
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainer,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Reward Milestone',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                                Text(
-                                  '250 points to unlock Free Batik Workshop',
-                                  style: GoogleFonts.beVietnamPro(
-                                    fontSize: 12,
-                                    color: AppColors.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            GestureDetector(
-                              onTap: () => Navigator.pushNamed(context, AppRouter.rewards),
-                              child: const Icon(Icons.arrow_forward, color: AppColors.primary),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(100),
-                          child: LinearProgressIndicator(
-                            value: 0.8,
-                            minHeight: 12,
-                            backgroundColor: AppColors.surfaceContainerHigh,
-                            valueColor: const AlwaysStoppedAnimation(AppColors.primary),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceContainerLowest.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: _availableRewards.isEmpty
-                              ? Text(
-                                  'Tidak ada reward yang bisa diklaim',
-                                  style: GoogleFonts.beVietnamPro(fontSize: 12),
-                                )
-                              : Column(
-                                  children: _availableRewards.take(2).map((reward) {
-                                    return Padding(
-                                      padding: const EdgeInsets.only(bottom: 8),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 40,
-                                            height: 40,
-                                            decoration: const BoxDecoration(
-                                              color: AppColors.secondaryContainer,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(Icons.redeem, color: AppColors.onSecondaryContainer),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  'CLAIMABLE REWARD',
-                                                  style: GoogleFonts.beVietnamPro(
-                                                    fontSize: 9,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: AppColors.onSecondaryContainer,
-                                                  ),
-                                                ),
-                                                Text(
-                                                  reward['name'] ?? 'Reward',
-                                                  style: GoogleFonts.beVietnamPro(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: AppColors.onSurface,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          ElevatedButton(
-                                            onPressed: () => _claimReward(reward['id'], reward['name']),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: AppColors.primary,
-                                              foregroundColor: Colors.white,
-                                              shape: const StadiumBorder(),
-                                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                              minimumSize: Size.zero,
-                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                            ),
-                                            child: Text(
-                                              'Klaim',
-                                              style: GoogleFonts.beVietnamPro(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
                   // Visit history
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -506,58 +498,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       GestureDetector(
                         onTap: () {
-                          // Show all visits in a dialog or navigate to a full screen
                           showDialog(
                             context: context,
                             builder: (context) => AlertDialog(
                               title: Text(
                                 'Semua Riwayat Kunjungan',
-                                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                               content: SizedBox(
                                 width: double.maxFinite,
-                                child: _visits.isEmpty
-                                    ? const Center(child: Text('Belum ada riwayat kunjungan'))
+                                child:
+                                    visitsHistory
+                                        .isEmpty // 🛠️ Menggunakan getter baru
+                                    ? const Center(
+                                        child: Text(
+                                          'Belum ada riwayat kunjungan',
+                                        ),
+                                      )
                                     : ListView.builder(
                                         shrinkWrap: true,
-                                        itemCount: _visits.length,
+                                        itemCount: visitsHistory
+                                            .length, // 🛠️ Menggunakan getter baru
                                         itemBuilder: (context, index) {
-                                          final visit = _visits[index];
-                                          final isDestination = visit['destination'] != null;
-                                          String? slug;
-                                          if (isDestination) {
-                                            slug = visit['destination']?['slug'] as String?;
-                                          } else {
-                                            slug = visit['culinary']?['slug'] as String?;
-                                          }
-                                          final routeName = isDestination ? '/destination' : '/culinary';
-                                          
+                                          final visit = visitsHistory[index];
+                                          final slug = visit['slug'] as String?;
+                                          final routeName =
+                                              visit['type'] == 'Destination'
+                                              ? '/destination'
+                                              : '/culinary';
+
                                           return ListTile(
                                             leading: ClipRRect(
-                                              borderRadius: BorderRadius.circular(8),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                               child: Image.network(
-                                                visit['destination']?['image'] ?? visit['culinary']?['image'] ?? '',
+                                                visit['image'] ??
+                                                    '', // 🛠️ Struktur Laravel baru langsung menggunakan 'image'
                                                 width: 50,
                                                 height: 50,
                                                 fit: BoxFit.cover,
-                                                errorBuilder: (context, error, stackTrace) => Container(
-                                                  width: 50,
-                                                  height: 50,
-                                                  color: AppColors.surfaceContainer,
-                                                  child: const Icon(Icons.image, color: AppColors.outline),
-                                                ),
+                                                errorBuilder:
+                                                    (
+                                                      context,
+                                                      error,
+                                                      stackTrace,
+                                                    ) => Container(
+                                                      width: 50,
+                                                      height: 50,
+                                                      color: AppColors
+                                                          .surfaceContainer,
+                                                      child: const Icon(
+                                                        Icons.image,
+                                                        color:
+                                                            AppColors.outline,
+                                                      ),
+                                                    ),
                                               ),
                                             ),
                                             title: Text(
-                                              visit['destination']?['name'] ?? visit['culinary']?['name'] ?? 'Unknown',
-                                              style: GoogleFonts.plusJakartaSans(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                              ),
+                                              visit['name'] ??
+                                                  'Unknown', // 🛠️ Struktur Laravel baru langsung menggunakan 'name'
+                                              style:
+                                                  GoogleFonts.plusJakartaSans(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
                                             ),
                                             subtitle: Text(
-                                              _formatDate(visit['visited_at']),
-                                              style: GoogleFonts.beVietnamPro(fontSize: 12),
+                                              visit['visited_at'] ??
+                                                  '', // 🛠️ Tanggal sudah diformat rapi dari Laravel
+                                              style: GoogleFonts.beVietnamPro(
+                                                fontSize: 12,
+                                              ),
                                             ),
                                             trailing: Text(
                                               '+${visit['points_earned'] ?? 0} pts',
@@ -570,7 +584,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             onTap: () {
                                               Navigator.pop(context);
                                               if (slug != null) {
-                                                Navigator.pushNamed(context, routeName, arguments: slug);
+                                                Navigator.pushNamed(
+                                                  context,
+                                                  routeName,
+                                                  arguments: slug,
+                                                );
                                               }
                                             },
                                           );
@@ -596,99 +614,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 fontSize: 13,
                               ),
                             ),
-                            const Icon(Icons.chevron_right, color: AppColors.primary, size: 18),
+                            const Icon(
+                              Icons.chevron_right,
+                              color: AppColors.primary,
+                              size: 18,
+                            ),
                           ],
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  ..._visits.take(3).map((visit) {
-                    final isDestination = visit['destination'] != null;
-                    final slug = isDestination 
-                        ? (visit['destination']?['slug']) 
-                        : (visit['culinary']?['slug']);
-                    final routeName = isDestination ? '/destination' : '/culinary';
-                    
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: GestureDetector(
-                        onTap: () {
-                          if (slug != null) {
-                            Navigator.pushNamed(context, routeName, arguments: slug);
-                          }
-                        },
-                        child: _VisitCard(
-                          image: visit['destination']?['image'] ?? visit['culinary']?['image'] ?? '',
-                          name: visit['destination']?['name'] ?? visit['culinary']?['name'] ?? 'Unknown',
-                          date: _formatDate(visit['visited_at']),
-                          rating: '${visit['destination']?['rating'] ?? visit['culinary']?['rating'] ?? 0}',
-                          comment: visit['notes'] ?? 'Kunjungan tercatat',
-                          points: '+${visit['points_earned'] ?? 0} pts',
+                  // 🛠️ MAPPING HALAMAN UTAMA (MAKSIMAL 3 RIWAYAT TERBARU)
+                  if (visitsHistory.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Center(
+                        child: Text(
+                          'Belum ada riwayat kunjungan',
+                          style: GoogleFonts.beVietnamPro(color: Colors.grey),
                         ),
                       ),
-                    );
-                  }),
-                  const SizedBox(height: 24),
-                  // Badges
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Badges Terkoleksi',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.onSurface,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => Navigator.pushNamed(context, AppRouter.badges),
-                        child: Row(
-                          children: [
-                            Text(
-                              'Lihat Semua',
-                              style: GoogleFonts.beVietnamPro(
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primary,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const Icon(Icons.chevron_right, color: AppColors.primary, size: 18),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 100,
-                    child: _myBadges.isEmpty
-                        ? Center(
-                            child: Text(
-                              'Belum ada badge',
-                              style: GoogleFonts.beVietnamPro(color: AppColors.onSurfaceVariant),
-                            ),
-                          )
-                        : ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _myBadges.length,
-                            itemBuilder: (context, index) {
-                              final badge = _myBadges[index];
-                              return _BadgeItem(
-                                icon: _getBadgeIcon(badge['icon'] ?? 'star'),
-                                label: badge['name'] ?? 'Badge',
-                                isActive: true,
+                    )
+                  else
+                    ...visitsHistory.take(3).map((visit) {
+                      final slug = visit['slug'] as String?;
+                      final routeName = visit['type'] == 'Destination'
+                          ? '/destination'
+                          : '/culinary';
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: GestureDetector(
+                          onTap: () {
+                            if (slug != null) {
+                              Navigator.pushNamed(
+                                context,
+                                routeName,
+                                arguments: slug,
                               );
-                            },
+                            }
+                          },
+                          child: _VisitCard(
+                            image:
+                                visit['image'] ??
+                                '', // 🛠️ Struktur bersih dari Laravel
+                            name:
+                                visit['name'] ??
+                                'Unknown', // 🛠️ Struktur bersih dari Laravel
+                            date:
+                                visit['visited_at'] ??
+                                '', // 🛠️ Struktur bersih dari Laravel
+                            rating: '', // 🛠️ Rating belum tersedia di Laravel, bisa ditambahkan nanti
+                            comment: visit['notes'] ?? 'Berhasil dikunjungi',
+                            points: '+${visit['points_earned'] ?? 0} pts',
                           ),
-                  ),
-                  const SizedBox(height: 32),
+                        ),
+                      );
+                    },),
                 ],
               ),
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -697,7 +686,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 class _StatCard extends StatelessWidget {
   final String label, value, sub;
   final IconData subIcon;
-  const _StatCard({required this.label, required this.value, required this.sub, required this.subIcon});
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.sub,
+    required this.subIcon,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -772,7 +766,9 @@ class _VisitCard extends StatelessWidget {
       child: Row(
         children: [
           ClipRRect(
-            borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+            borderRadius: const BorderRadius.horizontal(
+              left: Radius.circular(16),
+            ),
             child: Image.network(
               image,
               width: 96,
@@ -806,7 +802,10 @@ class _VisitCard extends StatelessWidget {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.surfaceContainerHigh,
                           borderRadius: BorderRadius.circular(100),
@@ -825,7 +824,11 @@ class _VisitCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.calendar_month_outlined, size: 12, color: AppColors.onSurfaceVariant),
+                      const Icon(
+                        Icons.calendar_month_outlined,
+                        size: 12,
+                        color: AppColors.onSurfaceVariant,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         date,
@@ -839,7 +842,11 @@ class _VisitCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.star, size: 14, color: Color(0xFFF2C94C)),
+                      const Icon(
+                        Icons.check_circle,
+                        size: 14,
+                        color: AppColors.primary,
+                      ),
                       const SizedBox(width: 2),
                       Text(
                         rating,
@@ -864,58 +871,6 @@ class _VisitCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _BadgeItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isActive;
-  const _BadgeItem({required this.icon, required this.label, required this.isActive});
-
-  @override
-  Widget build(BuildContext context) {
-    return Opacity(
-      opacity: isActive ? 1.0 : 0.3,
-      child: Container(
-        margin: const EdgeInsets.only(right: 16),
-        child: Column(
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: isActive ? AppColors.cream : AppColors.outlineVariant,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isActive ? AppColors.secondaryContainer : AppColors.outline,
-                  width: 2,
-                ),
-              ),
-              child: Icon(
-                icon,
-                color: isActive ? AppColors.secondary : AppColors.outline,
-                size: 28,
-              ),
-            ),
-            const SizedBox(height: 4),
-            SizedBox(
-              width: 64,
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.beVietnamPro(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.onSurface,
-                  height: 1.3,
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

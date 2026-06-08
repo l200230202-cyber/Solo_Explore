@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../core/theme.dart';
 import '../services/api_service.dart';
 import '../models/event.dart';
@@ -13,23 +14,48 @@ class EventScreen extends StatefulWidget {
 }
 
 class _EventScreenState extends State<EventScreen> {
-  int _selectedDay = 12;
-  final List<int> _daysWithEvents = [6, 13, 24];
+  late DateTime _currentFocusedDate;
+  int? _selectedDay;
   List<Event> _events = [];
   bool _isLoading = true;
+  List<int> _daysWithEvents = [];
 
   @override
   void initState() {
     super.initState();
-    _loadEvents();
+    _currentFocusedDate = DateTime.now();
+    _selectedDay = DateTime.now().day;
+    _loadEventsForMonth();
   }
 
-  Future<void> _loadEvents() async {
+  Future<void> _loadEventsForMonth() async {
+    setState(() => _isLoading = true);
     try {
-      final events = await ApiService().getEvents(upcoming: true);
+      final year = _currentFocusedDate.year;
+      final month = _currentFocusedDate.month;
+      final events = await ApiService().getEventsByMonth(
+        year: year,
+        month: month,
+      );
+
       if (mounted) {
         setState(() {
           _events = events;
+
+          // Amankan ekstraksi tanggal agar tidak melempar error subtype
+          _daysWithEvents = events
+              .map((e) {
+                try {
+                  return DateTime.parse(e.startDate).day;
+                } catch (err) {
+                  debugPrint("Format tanggal salah pada event ${e.name}: $err");
+                  return 0;
+                }
+              })
+              .where((day) => day != 0)
+              .toSet()
+              .toList();
+
           _isLoading = false;
         });
       }
@@ -37,14 +63,63 @@ class _EventScreenState extends State<EventScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text('Error mengambil data event: $e')),
         );
       }
     }
   }
 
+  void _previousMonth() {
+    setState(() {
+      _currentFocusedDate = DateTime(
+        _currentFocusedDate.year,
+        _currentFocusedDate.month - 1,
+        1,
+      );
+      _selectedDay = null;
+    });
+    _loadEventsForMonth();
+  }
+
+  void _nextMonth() {
+    setState(() {
+      _currentFocusedDate = DateTime(
+        _currentFocusedDate.year,
+        _currentFocusedDate.month + 1,
+        1,
+      );
+      _selectedDay = null;
+    });
+    _loadEventsForMonth();
+  }
+
+  List<int?> _generateCalendarDays() {
+    final year = _currentFocusedDate.year;
+    final month = _currentFocusedDate.month;
+    final firstDayOfMonth = DateTime(year, month, 1);
+    int blankSpaces = firstDayOfMonth.weekday == 7
+        ? 0
+        : firstDayOfMonth.weekday;
+    final lastDayOfMonth = DateTime(year, month + 1, 0);
+    final totalDays = lastDayOfMonth.day;
+
+    final List<int?> daysGrid = [];
+    for (int i = 0; i < blankSpaces; i++) {
+      daysGrid.add(null);
+    }
+    for (int i = 1; i <= totalDays; i++) {
+      daysGrid.add(i);
+    }
+    return daysGrid;
+  }
+
   @override
   Widget build(BuildContext context) {
+    String formattedMonthYear = DateFormat(
+      'MMMM yyyy',
+      'id_ID',
+    ).format(_currentFocusedDate);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5FAF0),
       body: CustomScrollView(
@@ -55,12 +130,13 @@ class _EventScreenState extends State<EventScreen> {
             elevation: 0,
             title: Text(
               'SoloExplore',
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: AppColors.primary),
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
             ),
             leading: const Icon(Icons.menu, color: AppColors.primary),
-            actions: const [
-              NotificationBadge(),
-            ],
+            actions: const [NotificationBadge()],
           ),
           SliverToBoxAdapter(
             child: Padding(
@@ -85,7 +161,6 @@ class _EventScreenState extends State<EventScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  // Calendar
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
@@ -98,7 +173,7 @@ class _EventScreenState extends State<EventScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'September 2024',
+                              formattedMonthYear,
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w600,
@@ -108,48 +183,46 @@ class _EventScreenState extends State<EventScreen> {
                             Row(
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.chevron_left, color: AppColors.primary),
-                                  onPressed: () {
-                                    // Navigate to previous month
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Navigasi bulan sebelumnya')),
-                                    );
-                                  },
+                                  icon: const Icon(
+                                    Icons.chevron_left,
+                                    color: AppColors.primary,
+                                  ),
+                                  onPressed: _previousMonth,
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.chevron_right, color: AppColors.primary),
-                                  onPressed: () {
-                                    // Navigate to next month
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Navigasi bulan berikutnya')),
-                                    );
-                                  },
+                                  icon: const Icon(
+                                    Icons.chevron_right,
+                                    color: AppColors.primary,
+                                  ),
+                                  onPressed: _nextMonth,
                                 ),
                               ],
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
-                        // Day headers
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: ['S', 'M', 'T', 'W', 'T', 'F', 'S']
-                              .map((d) => SizedBox(
-                                    width: 36,
-                                    child: Text(
-                                      d,
-                                      textAlign: TextAlign.center,
-                                      style: GoogleFonts.beVietnamPro(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.outline.withValues(alpha: 0.6),
+                              .map(
+                                (d) => SizedBox(
+                                  width: 36,
+                                  child: Text(
+                                    d,
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.beVietnamPro(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.outline.withValues(
+                                        alpha: 0.6,
                                       ),
                                     ),
-                                  ))
+                                  ),
+                                ),
+                              )
                               .toList(),
                         ),
                         const SizedBox(height: 12),
-                        // Calendar grid
                         _buildCalendarGrid(),
                       ],
                     ),
@@ -159,7 +232,7 @@ class _EventScreenState extends State<EventScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Upcoming Events',
+                        'Events',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
@@ -167,7 +240,11 @@ class _EventScreenState extends State<EventScreen> {
                         ),
                       ),
                       GestureDetector(
-                        onTap: () => Navigator.pushNamed(context, '/search'),
+                        onTap: () => Navigator.pushNamed(
+                          context,
+                          '/search',
+                          arguments: 'event',
+                        ),
                         child: Text(
                           'View All',
                           style: GoogleFonts.beVietnamPro(
@@ -192,7 +269,7 @@ class _EventScreenState extends State<EventScreen> {
                       child: Padding(
                         padding: const EdgeInsets.all(32),
                         child: Text(
-                          'Tidak ada event',
+                          'Tidak ada event di bulan ini',
                           style: GoogleFonts.beVietnamPro(
                             color: AppColors.onSurfaceVariant,
                           ),
@@ -200,20 +277,22 @@ class _EventScreenState extends State<EventScreen> {
                       ),
                     )
                   else
-                    ..._events.map((event) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _EventCard(
-                            image: event.image,
-                            category: event.categoryName ?? '',
-                            name: event.name,
-                            date: '${event.startDate} - ${event.endDate}',
-                            location: event.location,
-                            slug: event.slug,
-                            eventId: event.id,
-                            initialBookmarked: event.isBookmarked,
-                            onBookmarkChanged: () => _loadEvents(),  // ✅ ADDED: Reload on bookmark change
-                          ),
-                        )),
+                    ..._getFilteredEvents().map(
+                      (event) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _EventCard(
+                          image: event.image,
+                          category: event.categoryName ?? '',
+                          name: event.name,
+                          date: '${event.startDate} - ${event.endDate}',
+                          location: event.location,
+                          slug: event.slug,
+                          eventId: event.id,
+                          initialBookmarked: event.isBookmarked,
+                          onBookmarkChanged: () => _loadEventsForMonth(),
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 32),
                 ],
               ),
@@ -225,14 +304,7 @@ class _EventScreenState extends State<EventScreen> {
   }
 
   Widget _buildCalendarGrid() {
-    // Sep 2024 starts on Sunday
-    final List<int?> days = [
-      null, null, null, null, 1, 2, 3,
-      4, 5, 6, 7, 8, 9, 10,
-      11, 12, 13, 14, 15, 16, 17,
-      18, 19, 20, 21, 22, 23, 24,
-      25, 26, 27, 28, 29, 30, null,
-    ];
+    final days = _generateCalendarDays();
 
     return GridView.builder(
       shrinkWrap: true,
@@ -245,10 +317,13 @@ class _EventScreenState extends State<EventScreen> {
       itemBuilder: (context, index) {
         final day = days[index];
         if (day == null) return const SizedBox();
+
         final isSelected = day == _selectedDay;
         final hasEvent = _daysWithEvents.contains(day);
+
         return GestureDetector(
-          onTap: () => setState(() => _selectedDay = day),
+          onTap: () =>
+              setState(() => _selectedDay = (_selectedDay == day) ? null : day),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -265,7 +340,9 @@ class _EventScreenState extends State<EventScreen> {
                     '$day',
                     style: GoogleFonts.beVietnamPro(
                       fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
                       color: isSelected ? Colors.white : AppColors.onSurface,
                     ),
                   ),
@@ -287,6 +364,17 @@ class _EventScreenState extends State<EventScreen> {
       },
     );
   }
+
+  List<Event> _getFilteredEvents() {
+    if (_selectedDay == null) return _events;
+    return _events.where((event) {
+      try {
+        return DateTime.parse(event.startDate).day == _selectedDay;
+      } catch (_) {
+        return false;
+      }
+    }).toList();
+  }
 }
 
 class _EventCard extends StatefulWidget {
@@ -294,8 +382,8 @@ class _EventCard extends StatefulWidget {
   final String? slug;
   final int? eventId;
   final bool? initialBookmarked;
-  final VoidCallback? onBookmarkChanged;  // ✅ ADDED
-  
+  final VoidCallback? onBookmarkChanged;
+
   const _EventCard({
     required this.image,
     required this.category,
@@ -305,7 +393,7 @@ class _EventCard extends StatefulWidget {
     this.slug,
     this.eventId,
     this.initialBookmarked,
-    this.onBookmarkChanged,  // ✅ ADDED
+    this.onBookmarkChanged,
   });
 
   @override
@@ -333,18 +421,21 @@ class _EventCardState extends State<_EventCard> {
 
   Future<void> _toggleBookmark() async {
     if (widget.eventId == null) return;
-    
+
     final success = await ApiService().toggleBookmark('event', widget.eventId!);
     if (success && mounted) {
       setState(() => _isBookmarked = !_isBookmarked);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isBookmarked ? 'Ditambahkan ke bookmark' : 'Dihapus dari bookmark'),
+            content: Text(
+              _isBookmarked
+                  ? 'Ditambahkan ke bookmark'
+                  : 'Dihapus dari bookmark',
+            ),
             duration: const Duration(seconds: 1),
           ),
         );
-        // ✅ ADDED: Call callback to reload parent data
         widget.onBookmarkChanged?.call();
       }
     }
@@ -359,105 +450,144 @@ class _EventCardState extends State<_EventCard> {
         }
       },
       child: Container(
-      height: 144,
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
-            child: Image.network(
-              widget.image,
-              width: 120,
-              height: 144,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => Container(
-                width: 120,
-                color: AppColors.surfaceContainer,
-                child: const Icon(Icons.image, color: AppColors.outline),
+        // 1. HAPUS tinggi hardcode 'height: 144' agar kontainer fleksibel mengikuti isi teks
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: IntrinsicHeight(
+          // 2. BUNGKUS dengan IntrinsicHeight agar tinggi foto kiri sama dengan konten kanan
+          child: Row(
+            crossAxisAlignment:
+                CrossAxisAlignment.stretch, // Membuat foto memenuhi tinggi card
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(16),
+                ),
+                child: Image.network(
+                  widget.image,
+                  width: 120,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    width: 120,
+                    color: AppColors.surfaceContainer,
+                    child: const Icon(Icons.image, color: AppColors.outline),
+                  ),
+                ),
               ),
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    // 3. UBAH MainAxisAlignment agar tidak memaksa spasi renggang yang bikin overflow
+                    mainAxisAlignment: MainAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.cream,
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                        child: Text(
-                          widget.category.toUpperCase(),
-                          style: GoogleFonts.beVietnamPro(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.secondary,
-                            letterSpacing: 1,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.cream,
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: Text(
+                              widget.category.toUpperCase(),
+                              style: GoogleFonts.beVietnamPro(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.secondary,
+                                letterSpacing: 1,
+                              ),
+                            ),
                           ),
-                        ),
+                          IconButton(
+                            icon: Icon(
+                              _isBookmarked
+                                  ? Icons.bookmark
+                                  : Icons.bookmark_outline,
+                              color: _isBookmarked
+                                  ? AppColors.primary
+                                  : AppColors.outline,
+                              size: 20,
+                            ),
+                            onPressed: _toggleBookmark,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        icon: Icon(
-                          _isBookmarked ? Icons.bookmark : Icons.bookmark_outline,
-                          color: _isBookmarked ? AppColors.primary : AppColors.outline,
-                          size: 20,
-                        ),
-                        onPressed: _toggleBookmark,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    widget.name,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      const Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.onSurfaceVariant),
-                      const SizedBox(width: 4),
+                      const SizedBox(
+                        height: 8,
+                      ), // Beri jarak antar elemen secara manual
+                      // 4. BATASI maksimal baris judul atau gunakan Flexible jika ingin teks penuh
                       Text(
-                        widget.date,
-                        style: GoogleFonts.beVietnamPro(
-                          fontSize: 11,
-                          color: AppColors.onSurfaceVariant,
+                        widget.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      // 5. BUNGKUS teks detail dengan Expanded/Flexible agar jika teks tanggal/lokasi kepanjangan tidak overflow ke samping
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.calendar_today_outlined,
+                            size: 14,
+                            color: AppColors.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              widget.date,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.beVietnamPro(
+                                fontSize: 11,
+                                color: AppColors.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on_outlined,
+                            size: 14,
+                            color: AppColors.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              widget.location,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.beVietnamPro(
+                                fontSize: 11,
+                                color: AppColors.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on_outlined, size: 14, color: AppColors.onSurfaceVariant),
-                      const SizedBox(width: 4),
-                      Text(
-                        widget.location,
-                        style: GoogleFonts.beVietnamPro(
-                          fontSize: 11,
-                          color: AppColors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        ),
       ),
     );
   }

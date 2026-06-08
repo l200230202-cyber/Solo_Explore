@@ -30,7 +30,11 @@ class AppDrawer extends StatelessWidget {
                   const CircleAvatar(
                     radius: 32,
                     backgroundColor: Colors.white,
-                    child: Icon(Icons.person, size: 40, color: AppColors.primary),
+                    child: Icon(
+                      Icons.person,
+                      size: 40,
+                      color: AppColors.primary,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -52,92 +56,14 @@ class AppDrawer extends StatelessWidget {
               ),
             ),
 
-            // Menu Items
-            _buildMenuItem(
-              context,
-              icon: Icons.home,
-              title: 'Beranda',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushReplacementNamed(context, '/home');
-              },
-            ),
-            _buildMenuItem(
-              context,
-              icon: Icons.explore,
-              title: 'Jelajah',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushReplacementNamed(context, '/explore');
-              },
-            ),
-            _buildMenuItem(
-              context,
-              icon: Icons.map,
-              title: 'Peta',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushReplacementNamed(context, '/map');
-              },
-            ),
-            _buildMenuItem(
-              context,
-              icon: Icons.calendar_today,
-              title: 'Event',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushReplacementNamed(context, '/event');
-              },
-            ),
-            _buildMenuItem(
-              context,
-              icon: Icons.route,
-              title: 'Planner',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushReplacementNamed(context, '/planner');
-              },
-            ),
-            _buildMenuItem(
-              context,
-              icon: Icons.bookmark,
-              title: 'Bookmark',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/bookmark');
-              },
-            ),
-            _buildMenuItem(
-              context,
-              icon: Icons.person,
-              title: 'Profil',
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushReplacementNamed(context, '/profile');
-              },
-            ),
-
-            const Divider(height: 32),
-
-            // Settings & About
-            _buildMenuItem(
-              context,
-              icon: Icons.settings,
-              title: 'Pengaturan',
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Fitur Pengaturan segera hadir')),
-                );
-              },
-            ),
+            // Menu Items (Hanya Tentang Aplikasi & Bantuan)
             _buildMenuItem(
               context,
               icon: Icons.info_outline,
               title: 'Tentang Aplikasi',
               onTap: () {
-                Navigator.pop(context);
-                _showAboutDialog(context);
+                Navigator.pop(context); // Tutup drawer
+                _showAboutDialog(context); // Tampilkan dialog Tentang
               },
             ),
             _buildMenuItem(
@@ -145,16 +71,14 @@ class AppDrawer extends StatelessWidget {
               icon: Icons.help_outline,
               title: 'Bantuan',
               onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Hubungi kami di support@soloexplore.com')),
-                );
+                Navigator.pop(context); // Tutup drawer
+                _showHelpDialog(context); // Tampilkan dialog Bantuan baru
               },
             ),
 
             const Divider(height: 32),
 
-            // Logout
+            // Logout / Keluar
             _buildMenuItem(
               context,
               icon: Icons.logout,
@@ -174,7 +98,10 @@ class AppDrawer extends StatelessWidget {
                       ),
                       TextButton(
                         onPressed: () => Navigator.pop(context, true),
-                        child: const Text('Keluar', style: TextStyle(color: Colors.red)),
+                        child: const Text(
+                          'Keluar',
+                          style: TextStyle(color: Colors.red),
+                        ),
                       ),
                     ],
                   ),
@@ -188,8 +115,8 @@ class AppDrawer extends StatelessWidget {
             ),
 
             const SizedBox(height: 16),
-            
-            // Version
+
+            // Version Info
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
@@ -228,6 +155,7 @@ class AppDrawer extends StatelessWidget {
     );
   }
 
+  // DIALOG TENTANG APLIKASI
   void _showAboutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -256,17 +184,69 @@ class AppDrawer extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               'Version: 1.0.0',
-              style: GoogleFonts.beVietnamPro(
-                fontSize: 12,
-                color: Colors.grey,
-              ),
+              style: GoogleFonts.beVietnamPro(fontSize: 12, color: Colors.grey),
             ),
             Text(
               '© 2026 Solo Explore',
-              style: GoogleFonts.beVietnamPro(
-                fontSize: 12,
-                color: Colors.grey,
+              style: GoogleFonts.beVietnamPro(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // DIALOG BANTUAN KUSTOM BARU
+  void _showHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Pusat Bantuan',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Butuh Bantuan?',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
               ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Jika Anda mengalami kendala penggunaan aplikasi, kritik, atau saran, silakan hubungi tim dukungan kami.',
+              style: GoogleFonts.beVietnamPro(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Icon(
+                  Icons.email_outlined,
+                  size: 20,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'support@soloexplore.com',
+                    style: GoogleFonts.beVietnamPro(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

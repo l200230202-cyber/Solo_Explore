@@ -27,39 +27,18 @@ class _SearchScreenState extends State<SearchScreen> {
     super.didChangeDependencies();
 
     if (!_isArgsProcessed) {
-      final String? targetCategory = widget.initialCategory;
+      String? targetCategory = widget.initialCategory;
+
+      if (targetCategory == null || targetCategory.isEmpty) {
+        final args = ModalRoute.of(context)?.settings.arguments;
+        if (args is String) {
+          targetCategory = args;
+        }
+      }
 
       if (targetCategory != null && targetCategory.isNotEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          if (mounted) {
-            // 1. Teks di search bar tetap muncul "kuliner" secara visual
-            _searchController.text = targetCategory;
-
-            // 2. Jalankan trik bypass: Jika kirimannya 'kuliner', langsung panggil API kuliner riil!
-            if (targetCategory.toLowerCase() == 'kuliner') {
-              setState(() => _isLoading = true);
-              try {
-                // Tembak langsung API kuliner dari Laravel
-                final dataKuliner = await ApiService().getCulinaries(
-                  featured: true,
-                );
-
-                setState(() {
-                  _culinaries = dataKuliner;
-                  _destinations = []; // Pastikan destinasi kosong
-                  _events = []; // Pastikan event kosong
-                });
-              } catch (e) {
-                debugPrint('Error fetch kuliner direct: $e');
-              } finally {
-                setState(() => _isLoading = false);
-              }
-            } else {
-              // Jika argumennya bukan 'kuliner', jalankan search biasa
-              _search(targetCategory);
-            }
-          }
-        });
+        _searchController.text = targetCategory;
+        _handleCategoryViewAll(targetCategory);
       }
       _isArgsProcessed = true;
     }
@@ -68,15 +47,10 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
-
-    // Kita cek dulu: Konten default (destinasi, kuliner, event yang campur)
-    // HANYA akan di-load jika user masuk manual ke menu search.
-    // Jika user masuk karena klik 'Lihat Semua' dari beranda, fungsi ini akan dilewati.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final String? targetCategory =
-          ModalRoute.of(context)?.settings.arguments as String?;
-      if (targetCategory == null || targetCategory.isEmpty) {
-        _loadInitialContent(); // 👈 Ini memanggil fungsi bawaanmu yang di bawah
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (widget.initialCategory == null && args == null) {
+        _loadInitialContent();
       }
     });
   }
@@ -97,9 +71,42 @@ class _SearchScreenState extends State<SearchScreen> {
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleCategoryViewAll(String category) async {
+    setState(() => _isLoading = true);
+    final key = category.toLowerCase();
+    try {
+      if (key == 'event') {
+        final data = await ApiService().getEvents();
+        setState(() {
+          _events = data;
+          _destinations = [];
+          _culinaries = [];
+        });
+      } else if (key == 'kuliner') {
+        final data = await ApiService().getCulinaries();
+        setState(() {
+          _culinaries = data;
+          _destinations = [];
+          _events = [];
+        });
+      } else if (key == 'wisata' || key == 'destinasi') {
+        final data = await ApiService().getDestinations();
+        setState(() {
+          _destinations = data;
+          _culinaries = [];
+          _events = [];
+        });
+      } else {
+        _search(category);
       }
+    } catch (e) {
+      debugPrint('Error view all category: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -109,20 +116,23 @@ class _SearchScreenState extends State<SearchScreen> {
       return;
     }
 
+    final key = query.toLowerCase();
+    if (key == 'event' ||
+        key == 'kuliner' ||
+        key == 'wisata' ||
+        key == 'destinasi') {
+      _handleCategoryViewAll(query);
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       final results = await ApiService().search(query);
 
       setState(() {
-        if (query.toLowerCase() == 'kuliner') {
-          _culinaries = List<Culinary>.from(results['culinaries'] ?? []);
-          _destinations = [];
-          _events = [];
-        } else {
-          _destinations = List<Destination>.from(results['destinations'] ?? []);
-          _culinaries = List<Culinary>.from(results['culinaries'] ?? []);
-          _events = List<Event>.from(results['events'] ?? []);
-        }
+        _destinations = List<Destination>.from(results['destinations'] ?? []);
+        _culinaries = List<Culinary>.from(results['culinaries'] ?? []);
+        _events = List<Event>.from(results['events'] ?? []);
       });
     } catch (e) {
       if (mounted) {
@@ -131,9 +141,7 @@ class _SearchScreenState extends State<SearchScreen> {
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -155,7 +163,6 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
         title: TextField(
           controller: _searchController,
-          autofocus: true,
           decoration: InputDecoration(
             hintText: 'Cari destinasi, kuliner, event...',
             border: InputBorder.none,

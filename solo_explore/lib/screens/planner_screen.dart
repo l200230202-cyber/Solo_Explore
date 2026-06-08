@@ -32,14 +32,16 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
     try {
       final response = await _apiService.getTripPlans();
-      if (response['success']) {
+      // ✅ PERBAIKAN: Menghapus response != null dan ganti ?[ menjadi [
+      if ((response['success'] ?? false) == true) {
         setState(() {
           _tripPlans = response['data'] ?? [];
           _isLoading = false;
         });
       } else {
         setState(() {
-          _errorMessage = response['message'] ?? 'Gagal memuat rencana perjalanan';
+          _errorMessage =
+              response['message'] ?? 'Gagal memuat rencana perjalanan';
           _isLoading = false;
         });
       }
@@ -152,7 +154,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 }
                 if (startDate == null || endDate == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Pilih tanggal mulai dan selesai')),
+                    const SnackBar(
+                      content: Text('Pilih tanggal mulai dan selesai'),
+                    ),
                   );
                   return;
                 }
@@ -173,7 +177,12 @@ class _PlannerScreenState extends State<PlannerScreen> {
     );
   }
 
-  Future<void> _createPlan(String name, String description, DateTime startDate, DateTime endDate) async {
+  Future<void> _createPlan(
+    String name,
+    String description,
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
     try {
       final response = await _apiService.createTripPlan(
         name: name,
@@ -183,22 +192,25 @@ class _PlannerScreenState extends State<PlannerScreen> {
       );
 
       if (mounted) {
-        if (response['success']) {
+        // ✅ PERBAIKAN: Menghapus response != null dan ganti ?[ menjadi [
+        if ((response['success'] ?? false) == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Rencana berhasil dibuat')),
           );
           _loadTripPlans();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(response['message'] ?? 'Gagal membuat rencana')),
+            SnackBar(
+              content: Text(response['message'] ?? 'Gagal membuat rencana'),
+            ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Terjadi kesalahan: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Terjadi kesalahan: $e')));
       }
     }
   }
@@ -230,22 +242,25 @@ class _PlannerScreenState extends State<PlannerScreen> {
       try {
         final response = await _apiService.deleteTripPlan(planId);
         if (mounted) {
-          if (response['success']) {
+          // ✅ PERBAIKAN: Menghapus response != null dan ganti ?[ menjadi [
+          if ((response['success'] ?? false) == true) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Rencana berhasil dihapus')),
             );
             _loadTripPlans();
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(response['message'] ?? 'Gagal menghapus rencana')),
+              SnackBar(
+                content: Text(response['message'] ?? 'Gagal menghapus rencana'),
+              ),
             );
           }
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Terjadi kesalahan: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Terjadi kesalahan: $e')));
         }
       }
     }
@@ -283,10 +298,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
+                  // ✅ PERBAIKAN: Menggunakan initialValue menggantikan value yang deprecated
                   initialValue: selectedInterest,
-                  decoration: const InputDecoration(
-                    labelText: 'Minat',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Minat'),
                   items: const [
                     DropdownMenuItem(value: 'budaya', child: Text('Budaya')),
                     DropdownMenuItem(value: 'kuliner', child: Text('Kuliner')),
@@ -310,7 +324,10 @@ class _PlannerScreenState extends State<PlannerScreen> {
             ElevatedButton(
               onPressed: () async {
                 Navigator.pop(context);
-                await _performGenerateAI(budgetController.text, selectedInterest);
+                await _performGenerateAI(
+                  budgetController.text,
+                  selectedInterest,
+                );
               },
               child: const Text('Generate'),
             ),
@@ -328,20 +345,25 @@ class _PlannerScreenState extends State<PlannerScreen> {
         builder: (context) => const Center(child: CircularProgressIndicator()),
       );
 
-      // First create a new trip plan for AI generation
       final now = DateTime.now();
       final createResponse = await _apiService.createTripPlan(
         name: 'Rencana AI - ${now.day}/${now.month}/${now.year}',
-        description: 'Rencana perjalanan yang dibuat oleh AI berdasarkan budget dan minat Anda',
+        description:
+            'Rencana perjalanan yang dibuat oleh AI berdasarkan budget dan minat Anda',
         startDate: now,
-        endDate: now.add(const Duration(days: 3)), // Default 3 days
+        endDate: now.add(const Duration(days: 3)),
       );
 
-      if (!createResponse['success']) {
+      // ✅ PERBAIKAN: Menghapus createResponse != null dan ganti ?[ menjadi [
+      if ((createResponse['success'] ?? false) == false) {
         if (mounted) {
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(createResponse['message'] ?? 'Gagal membuat rencana')),
+            SnackBar(
+              content: Text(
+                createResponse['message'] ?? 'Gagal membuat rencana wadah AI',
+              ),
+            ),
           );
         }
         return;
@@ -349,8 +371,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
       final planId = createResponse['data']['id'];
       final budgetValue = double.tryParse(budget) ?? 500000.0;
-      final interestsList = [interest]; // Convert to List<String>
-      final duration = 3; // Default 3 days
+      final interestsList = [interest];
+      final duration = 3;
 
       final response = await _apiService.generateAIPlan(
         planId: planId,
@@ -360,25 +382,28 @@ class _PlannerScreenState extends State<PlannerScreen> {
       );
 
       if (mounted) {
-        Navigator.pop(context); // Close loading dialog
+        Navigator.pop(context); // Tutup loading dialog
 
-        if (response['success']) {
+        // ✅ PERBAIKAN: Menghapus response != null dan ganti ?[ menjadi [
+        if ((response['success'] ?? false) == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Rencana AI berhasil dibuat')),
           );
           _loadTripPlans();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(response['message'] ?? 'Gagal generate rencana')),
+            SnackBar(
+              content: Text(response['message'] ?? 'Gagal generate rencana'),
+            ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // Close loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Terjadi kesalahan: $e')),
-        );
+        Navigator.pop(context); // Tutup loading dialog
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Terjadi kesalahan: $e')));
       }
     }
   }
@@ -395,12 +420,13 @@ class _PlannerScreenState extends State<PlannerScreen> {
             elevation: 0,
             title: Text(
               'SoloExplore',
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, color: AppColors.primary),
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
             ),
             leading: const Icon(Icons.menu, color: AppColors.primary),
-            actions: const [
-              NotificationBadge(),
-            ],
+            actions: const [NotificationBadge()],
           ),
           SliverToBoxAdapter(
             child: Padding(
@@ -436,7 +462,6 @@ class _PlannerScreenState extends State<PlannerScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  // Create Plan Button
                   SizedBox(
                     width: double.infinity,
                     height: 56,
@@ -445,18 +470,22 @@ class _PlannerScreenState extends State<PlannerScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         elevation: 0,
                       ),
                       icon: const Icon(Icons.add),
                       label: Text(
                         'Buat Rencana Baru',
-                        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 16),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // Generate AI Button
                   SizedBox(
                     width: double.infinity,
                     height: 56,
@@ -464,13 +493,21 @@ class _PlannerScreenState extends State<PlannerScreen> {
                       onPressed: _generateAIPlan,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
-                        side: const BorderSide(color: AppColors.primary, width: 2),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        side: const BorderSide(
+                          color: AppColors.primary,
+                          width: 2,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       icon: const Icon(Icons.auto_awesome),
                       label: Text(
                         'Generate Rencana AI',
-                        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 16),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ),
@@ -479,7 +516,6 @@ class _PlannerScreenState extends State<PlannerScreen> {
               ),
             ),
           ),
-          // Trip Plans List
           if (_isLoading)
             const SliverFillRemaining(
               child: Center(child: CircularProgressIndicator()),
@@ -490,9 +526,20 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, size: 64, color: AppColors.error),
+                    const Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: AppColors.error,
+                    ),
                     const SizedBox(height: 16),
-                    Text(_errorMessage!, style: GoogleFonts.beVietnamPro()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      child: Text(
+                        _errorMessage!,
+                        style: GoogleFonts.beVietnamPro(),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: _loadTripPlans,
@@ -508,7 +555,11 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.map_outlined, size: 64, color: AppColors.outline),
+                    const Icon(
+                      Icons.map_outlined,
+                      size: 64,
+                      color: AppColors.outline,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'Belum ada rencana perjalanan',
@@ -534,23 +585,20 @@ class _PlannerScreenState extends State<PlannerScreen> {
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
               sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final plan = _tripPlans[index];
-                    return _TripPlanCard(
-                      plan: plan,
-                      onTap: () {
-                        Navigator.pushNamed(
-                          context,
-                          AppRouter.tripPlanDetail,
-                          arguments: plan['id'],
-                        ).then((_) => _loadTripPlans());
-                      },
-                      onDelete: () => _deletePlan(plan['id']),
-                    );
-                  },
-                  childCount: _tripPlans.length,
-                ),
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final plan = _tripPlans[index];
+                  return _TripPlanCard(
+                    plan: plan,
+                    onTap: () {
+                      Navigator.pushNamed(
+                        context,
+                        AppRouter.tripPlanDetail,
+                        arguments: plan['id'],
+                      ).then((_) => _loadTripPlans());
+                    },
+                    onDelete: () => _deletePlan(plan['id']),
+                  );
+                }, childCount: _tripPlans.length),
               ),
             ),
         ],
@@ -575,7 +623,7 @@ class _TripPlanCard extends StatelessWidget {
     final itemCount = plan['items_count'] ?? 0;
     final startDate = plan['start_date'] ?? '';
     final endDate = plan['end_date'] ?? '';
-    final title = plan['title'] ?? plan['name'] ?? 'Rencana Perjalanan';  // ✅ FIXED: Support both 'title' and 'name'
+    final title = plan['title'] ?? plan['name'] ?? 'Rencana Perjalanan';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -604,7 +652,7 @@ class _TripPlanCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        title,  // ✅ FIXED: Use the variable instead of direct access
+                        title,
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -613,12 +661,16 @@ class _TripPlanCard extends StatelessWidget {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: AppColors.error,
+                      ),
                       onPressed: onDelete,
                     ),
                   ],
                 ),
-                if (plan['description'] != null && plan['description'].toString().isNotEmpty) ...[
+                if (plan['description'] != null &&
+                    plan['description'].toString().isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
                     plan['description'],
@@ -633,7 +685,11 @@ class _TripPlanCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    const Icon(Icons.calendar_today, size: 16, color: AppColors.primary),
+                    const Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       '$startDate - $endDate',
@@ -644,7 +700,10 @@ class _TripPlanCard extends StatelessWidget {
                     ),
                     const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.primaryContainer,
                         borderRadius: BorderRadius.circular(100),

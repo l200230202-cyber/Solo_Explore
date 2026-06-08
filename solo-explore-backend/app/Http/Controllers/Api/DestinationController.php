@@ -247,4 +247,51 @@ class DestinationController extends Controller
             'is_bookmarked' => $userId ? $dest->isBookmarkedBy($userId) : false,
         ];
     }
+
+    public function getNearby(Request $request)
+    {
+        try {
+            // 1. Validasi input koordinat dari Flutter
+            $request->validate([
+                'lat' => 'required|numeric',
+                'lng' => 'required|numeric',
+            ]);
+
+            $userLat = $request->lat;
+            $userLng = $request->lng;
+
+            // 2. Query data menggunakan rumus Haversine (6371 untuk KM)
+            $destinations = Destination::with('category')
+                ->select('*')
+                ->selectRaw(
+                    '(6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))) AS distance_km',
+                    [$userLat, $userLng, $userLat]
+                )
+                ->orderBy('distance_km', 'asc') // Urutkan dari yang terdekat
+                ->take(10) // Batasi 10 data terdekat saja
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Nearby destinations retrieved successfully',
+                'data' => $destinations->map(function ($dest) {
+                    // Ambil format default bawaan kodemu
+                    $formatted = $this->formatDestination($dest);
+                    
+                    // Sisipkan field jarak agar bisa dibaca di kartu Flutter kamu
+                    $formatted['distance'] = round($dest->distance_km, 1) . ' km';
+                    return $formatted;
+                }),
+                'errors' => null,
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve nearby destinations',
+                'data' => null,
+                'errors' => ['server' => [$e->getMessage()]],
+            ], 500);
+        }
+    }
 }

@@ -11,7 +11,8 @@ class DestinationDetailScreen extends StatefulWidget {
   const DestinationDetailScreen({super.key, required this.slug});
 
   @override
-  State<DestinationDetailScreen> createState() => _DestinationDetailScreenState();
+  State<DestinationDetailScreen> createState() =>
+      _DestinationDetailScreenState();
 }
 
 class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
@@ -38,37 +39,54 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
 
   Future<void> _toggleBookmark() async {
     if (_destination == null) return;
-    final success = await ApiService().toggleBookmark('destination', _destination!.id);
+    final success = await ApiService().toggleBookmark(
+      'destination',
+      _destination!.id,
+    );
     if (success && mounted) {
       setState(() => _isBookmarked = !_isBookmarked);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_isBookmarked ? 'Ditambahkan ke bookmark' : 'Dihapus dari bookmark'),
+          content: Text(
+            _isBookmarked ? 'Ditambahkan ke bookmark' : 'Dihapus dari bookmark',
+          ),
           duration: const Duration(seconds: 1),
         ),
       );
-      // Reload data to persist bookmark state
       _loadData();
     }
   }
 
   Future<void> _recordVisit() async {
     if (_destination == null) return;
+
     final success = await ApiService().recordVisitDestination(_destination!.id);
-    if (success && mounted) {
+
+    if (!mounted) return; // Cek mounted di awal agar lebih aman
+
+    if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Kunjungan berhasil dicatat! +50 poin'),
           backgroundColor: Colors.green,
+        ),
+      );
+
+    } else {
+      // 🛠️ TAMBAHAN: Munculkan notifikasi jika user sudah pernah berkunjung
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kamu sudah pernah mencatat kunjungan di tempat ini!'),
+          backgroundColor: Colors.orange,
         ),
       );
     }
@@ -76,8 +94,9 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
 
   void _shareDestination() {
     if (_destination == null) return;
-    
-    final String shareText = '''
+
+    final String shareText =
+        '''
 🗺️ ${_destination!.name}
 
 📍 ${_destination!.location}
@@ -96,16 +115,21 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
     );
   }
 
+  // 🛠️ SEKARANG MEMBUKA GOOGLE MAPS ASLI BERDASARKAN KOORDINAT & NAMA
   Future<void> _openDirections() async {
     if (_destination == null) return;
-    
+
     final lat = _destination!.latitude;
     final lng = _destination!.longitude;
-    final name = Uri.encodeComponent(_destination!.name);
-    
-    // Google Maps URL with directions
-    final url = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&destination_place_id=$name');
-    
+    final name = Uri.encodeComponent(
+      '${_destination!.name} ${_destination!.location}',
+    );
+
+    // URL Skema universal untuk membuka Google Maps atau rute navigasi
+    final url = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$lat,$lng&query_place_id=$name',
+    );
+
     try {
       if (await canLaunchUrl(url)) {
         await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -118,8 +142,29 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
       }
     } catch (e) {
       if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  // 🛠️ FUNGSI BARU UNTUK MELIHAT ULASAN LANGSUNG DI GOOGLE MAPS
+  Future<void> _openGoogleMapsReviews() async {
+    if (_destination == null) return;
+    final nameEncoded = Uri.encodeComponent(
+      '${_destination!.name} ${_destination!.location}',
+    );
+    final url = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$nameEncoded',
+    );
+
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          const SnackBar(content: Text('Gagal membuka ulasan di Google Maps')),
         );
       }
     }
@@ -127,7 +172,7 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
 
   void _showReviewDialog() {
     if (_destination == null) return;
-    
+
     int rating = 5;
     final commentController = TextEditingController();
     final messenger = ScaffoldMessenger.of(context);
@@ -217,14 +262,15 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
       if (plans.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Belum ada trip plan. Buat dulu di menu Planner')),
+            const SnackBar(
+              content: Text('Belum ada trip plan. Buat dulu di menu Planner'),
+            ),
           );
         }
         return;
       }
 
       if (!mounted) return;
-
       final messenger = ScaffoldMessenger.of(context);
 
       await showDialog(
@@ -252,19 +298,19 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
                   ),
                   onTap: () async {
                     Navigator.pop(dialogContext);
-                    final success = await ApiService().addItemToPlan(
-                      plan['id'],
-                      {
-                        'plannable_type': 'destination',
-                        'plannable_id': _destination!.id,
-                        'day_number': 1,
-                      },
-                    );
+                    final success = await ApiService()
+                        .addItemToPlan(plan['id'], {
+                          'plannable_type': 'destination',
+                          'plannable_id': _destination!.id,
+                          'day_number': 1,
+                        });
                     messenger.showSnackBar(
                       SnackBar(
-                        content: Text(success
-                            ? 'Destinasi berhasil ditambahkan ke trip plan'
-                            : 'Gagal menambahkan ke trip plan'),
+                        content: Text(
+                          success
+                              ? 'Destinasi berhasil ditambahkan ke trip plan'
+                              : 'Gagal menambahkan ke trip plan',
+                        ),
                         backgroundColor: success ? Colors.green : Colors.red,
                       ),
                     );
@@ -283,9 +329,9 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -293,9 +339,7 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_destination == null) {
@@ -323,7 +367,9 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
             ),
             actions: [
               IconButton(
-                icon: Icon(_isBookmarked ? Icons.bookmark : Icons.bookmark_outline),
+                icon: Icon(
+                  _isBookmarked ? Icons.bookmark : Icons.bookmark_outline,
+                ),
                 onPressed: _toggleBookmark,
               ),
               IconButton(
@@ -339,7 +385,10 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.secondaryContainer,
                       borderRadius: BorderRadius.circular(100),
@@ -362,26 +411,91 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.star, color: Colors.amber, size: 20),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${_destination!.rating}',
-                        style: GoogleFonts.beVietnamPro(fontWeight: FontWeight.w700),
-                      ),
-                      Text(
-                        ' (${_destination!.totalReviews} ulasan)',
-                        style: GoogleFonts.beVietnamPro(color: AppColors.onSurfaceVariant),
-                      ),
-                    ],
+                  // 🛠️ SEKARANG KEDUA TOMBOL DIPISAH SECARA ADIL
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        // 🛠️ TOMBOL 1: Klik rating/ulasan untuk membuka Dialog Ulasan Lokal
+                        InkWell(
+                          onTap: _showReviewDialog, // Memicu fungsi lokal Anda
+                          borderRadius: BorderRadius.circular(4),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 2,
+                              horizontal: 4,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.star,
+                                  color: Colors.amber,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${_destination!.rating}',
+                                  style: GoogleFonts.beVietnamPro(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                Text(
+                                  ' (${_destination!.totalReviews} ulasan)',
+                                  style: GoogleFonts.beVietnamPro(
+                                    color: AppColors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        Text(
+                          '  •  ',
+                          style: GoogleFonts.beVietnamPro(
+                            color: AppColors.onSurfaceVariant,
+                          ),
+                        ),
+
+                        // 🛠️ TOMBOL 2: Hanya teks ini yang pergi ke luar (Google Maps)
+                        InkWell(
+                          onTap: _openGoogleMapsReviews,
+                          borderRadius: BorderRadius.circular(4),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            child: Text(
+                              'Lihat di Maps ↗',
+                              style: GoogleFonts.beVietnamPro(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 16),
-                  _InfoRow(icon: Icons.location_on, text: _destination!.location),
+                  _InfoRow(
+                    icon: Icons.location_on,
+                    text: _destination!.location,
+                  ),
                   if (_destination!.ticketPrice != null)
-                    _InfoRow(icon: Icons.confirmation_number, text: _destination!.ticketPrice!),
+                    _InfoRow(
+                      icon: Icons.confirmation_number,
+                      text: _destination!.ticketPrice!,
+                    ),
                   if (_destination!.openingHours != null)
-                    _InfoRow(icon: Icons.access_time, text: _destination!.openingHours!),
+                    _InfoRow(
+                      icon: Icons.access_time,
+                      text: _destination!.openingHours!,
+                    ),
                   const SizedBox(height: 24),
                   Text(
                     'Deskripsi',
@@ -406,7 +520,7 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
                         child: SizedBox(
                           height: 52,
                           child: OutlinedButton.icon(
-                            onPressed: () => _showReviewDialog(),
+                            onPressed: _showReviewDialog,
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.primary,
                               side: const BorderSide(color: AppColors.primary),
@@ -430,7 +544,7 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
                         child: SizedBox(
                           height: 52,
                           child: ElevatedButton.icon(
-                            onPressed: () => _recordVisit(),
+                            onPressed: _recordVisit,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.secondary,
                               foregroundColor: AppColors.onSecondary,
@@ -475,6 +589,7 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
                     ),
                   ),
                   const SizedBox(height: 12),
+                  // TOMBOL TAMBAH KE TRIP PLAN (GAMBAR 2)
                   SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -522,10 +637,7 @@ class _InfoRow extends StatelessWidget {
           Icon(icon, size: 20, color: AppColors.primary),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              text,
-              style: GoogleFonts.beVietnamPro(fontSize: 14),
-            ),
+            child: Text(text, style: GoogleFonts.beVietnamPro(fontSize: 14)),
           ),
         ],
       ),

@@ -48,6 +48,7 @@ Route::prefix('password')->group(function () {
     // Recommendations
 Route::get('/destinations/recommendations', [DestinationController::class, 'recommendations']);
 Route::get('/culinaries/recommendations', [CulinaryController::class, 'recommendations']);
+Route::get('/destinations/nearby', [DestinationController::class, 'getNearby']);
 
 Route::get('categories', [CategoryController::class, 'index']);
 Route::get('destinations', [DestinationController::class, 'index']);
