@@ -1,3 +1,5 @@
+import 'culinary.dart'; // Mengimpor class Review yang sudah kita buat kemarin
+
 class Destination {
   final int id;
   final String name;
@@ -17,6 +19,7 @@ class Destination {
   final bool? isFeatured;
   final bool? isBookmarked;
   final String categoryName;
+  final List<Review> reviews; // ✅ Tambahkan ini
 
   Destination({
     required this.id,
@@ -37,6 +40,7 @@ class Destination {
     this.isFeatured,
     this.isBookmarked,
     required this.categoryName,
+    this.reviews = const [], // ✅ Default ke list kosong
   });
 
   factory Destination.fromJson(Map<String, dynamic> json) {
@@ -47,11 +51,17 @@ class Destination {
       description: json['description'] ?? '',
       location: json['location'] ?? '',
       address: json['address'],
-      latitude: json['latitude'] != null ? double.tryParse(json['latitude'].toString()) : null,
-      longitude: json['longitude'] != null ? double.tryParse(json['longitude'].toString()) : null,
+      latitude: json['latitude'] != null
+          ? double.tryParse(json['latitude'].toString())
+          : null,
+      longitude: json['longitude'] != null
+          ? double.tryParse(json['longitude'].toString())
+          : null,
       image: json['image'] ?? '',
       images: json['images'] != null ? List<String>.from(json['images']) : [],
-      rating: json['rating'] != null ? double.tryParse(json['rating'].toString()) ?? 0.0 : 0.0,
+      rating: json['rating'] != null
+          ? double.tryParse(json['rating'].toString()) ?? 0.0
+          : 0.0,
       totalReviews: json['total_reviews'] ?? 0,
       ticketPrice: json['ticket_price'],
       openingHours: json['opening_hours'],
@@ -59,6 +69,10 @@ class Destination {
       isFeatured: json['is_featured'],
       isBookmarked: json['is_bookmarked'],
       categoryName: json['category_name'] ?? '',
+      // ✅ Ambil data list ulasan wisata dari API Laravel
+      reviews: json['reviews'] != null
+          ? (json['reviews'] as List).map((r) => Review.fromJson(r)).toList()
+          : [],
     );
   }
 }

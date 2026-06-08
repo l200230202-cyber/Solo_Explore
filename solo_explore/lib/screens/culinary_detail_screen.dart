@@ -6,6 +6,7 @@ import '../core/theme.dart';
 import '../services/api_service.dart';
 import '../models/culinary.dart';
 
+
 class CulinaryDetailScreen extends StatefulWidget {
   final String slug;
   const CulinaryDetailScreen({super.key, required this.slug});
@@ -38,25 +39,29 @@ class _CulinaryDetailScreenState extends State<CulinaryDetailScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
 
   Future<void> _toggleBookmark() async {
     if (_culinary == null) return;
-    final success = await ApiService().toggleBookmark('culinary', _culinary!.id);
+    final success = await ApiService().toggleBookmark(
+      'culinary',
+      _culinary!.id,
+    );
     if (success && mounted) {
       setState(() => _isBookmarked = !_isBookmarked);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_isBookmarked ? 'Ditambahkan ke bookmark' : 'Dihapus dari bookmark'),
+          content: Text(
+            _isBookmarked ? 'Ditambahkan ke bookmark' : 'Dihapus dari bookmark',
+          ),
           duration: const Duration(seconds: 1),
         ),
       );
-      // Reload data to persist bookmark state
       _loadData();
     }
   }
@@ -76,8 +81,9 @@ class _CulinaryDetailScreenState extends State<CulinaryDetailScreen> {
 
   void _shareCulinary() {
     if (_culinary == null) return;
-    
-    final String shareText = '''
+
+    final String shareText =
+        '''
 🍽️ ${_culinary!.name}
 
 📍 ${_culinary!.location}
@@ -91,44 +97,79 @@ Temukan lebih banyak kuliner lezat di Solo Raya dengan aplikasi Solo Explore!
 #SoloExplore #KulinerSolo #MakanEnak
 ''';
 
-    Share.share(
-      shareText,
-      subject: 'Coba ${_culinary!.name} di Solo Explore',
-    );
+    Share.share(shareText, subject: 'Coba ${_culinary!.name} di Solo Explore');
   }
 
   Future<void> _openDirections() async {
     if (_culinary == null) return;
-    
+
     final lat = _culinary!.latitude;
     final lng = _culinary!.longitude;
     final name = Uri.encodeComponent(_culinary!.name);
-    
-    // Google Maps URL with directions
-    final url = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&destination_place_id=$name');
-    
-    try {
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
+
+    // Jika data koordinat dari API Laravel ternyata kosong, gunakan nama lokasi sebagai fallback pencarian
+    if (lat == null || lng == null) {
+      final fallbackUrl = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=$name',
+      );
+      try {
+        if (await canLaunchUrl(fallbackUrl)) {
+          await launchUrl(fallbackUrl, mode: LaunchMode.externalApplication);
+        } else {
+          throw 'Could not launch URL';
+        }
+      } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Tidak bisa membuka Google Maps')),
           );
         }
       }
+      return;
+    }
+
+    // Skema URL Google Maps berdasarkan sistem operasi (Android/iOS)
+    // Menggunakan parameter 'q' agar maps memunculkan pin merah di koordinat tersebut dengan nama kulinernya
+    final String googleMapsUrl = 'geo:$lat,$lng?q=$lat,$lng($name)';
+    final String appleMapsUrl = 'https://maps.apple.com/?q=$name&ll=$lat,$lng';
+
+    final Uri url = Uri.parse(googleMapsUrl);
+    final Uri iosUrl = Uri.parse(appleMapsUrl);
+
+    try {
+      if (await canLaunchUrl(url)) {
+        // Untuk Android (membuka aplikasi Google Maps langsung)
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(iosUrl)) {
+        // Untuk iOS (membuka Apple Maps / Google Maps iOS)
+        await launchUrl(iosUrl, mode: LaunchMode.externalApplication);
+      } else {
+        // Fallback terakhir: Buka Google Maps lewat browser web biasa
+        final webUrl = Uri.parse(
+          'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+        );
+        if (await canLaunchUrl(webUrl)) {
+          await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Tidak bisa membuka Google Maps')),
+            );
+          }
+        }
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
 
   void _showReviewDialog() {
     if (_culinary == null) return;
-    
+
     int rating = 5;
     final commentController = TextEditingController();
     final messenger = ScaffoldMessenger.of(context);
@@ -214,11 +255,14 @@ Temukan lebih banyak kuliner lezat di Solo Raya dengan aplikasi Solo Explore!
       final response = await ApiService().getTripPlans();
       if (!response['success'] || !mounted) return;
 
-      final plans = response['data'] as List;
+      // ✅ PERBAIKAN 1: Cast sebagai List<dynamic> agar elemen di dalamnya bisa dibaca sebagai Map
+      final plans = response['data'] as List<dynamic>;
       if (plans.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Belum ada trip plan. Buat dulu di menu Planner')),
+            const SnackBar(
+              content: Text('Belum ada trip plan. Buat dulu di menu Planner'),
+            ),
           );
         }
         return;
@@ -253,19 +297,19 @@ Temukan lebih banyak kuliner lezat di Solo Raya dengan aplikasi Solo Explore!
                   ),
                   onTap: () async {
                     Navigator.pop(dialogContext);
-                    final success = await ApiService().addItemToPlan(
-                      plan['id'],
-                      {
-                        'plannable_type': 'culinary',
-                        'plannable_id': _culinary!.id,
-                        'day_number': 1,
-                      },
-                    );
+                    final success = await ApiService()
+                        .addItemToPlan(plan['id'], {
+                          'plannable_type': 'culinary',
+                          'plannable_id': _culinary!.id,
+                          'day_number': 1,
+                        });
                     messenger.showSnackBar(
                       SnackBar(
-                        content: Text(success
-                            ? 'Kuliner berhasil ditambahkan ke trip plan'
-                            : 'Gagal menambahkan ke trip plan'),
+                        content: Text(
+                          success
+                              ? 'Kuliner berhasil ditambahkan ke trip plan'
+                              : 'Gagal menambahkan ke trip plan',
+                        ),
                         backgroundColor: success ? Colors.green : Colors.red,
                       ),
                     );
@@ -284,9 +328,39 @@ Temukan lebih banyak kuliner lezat di Solo Raya dengan aplikasi Solo Explore!
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _openGoogleMapsReviews() async {
+    if (_culinary == null) return;
+
+    // Melakukan pencarian di Google Maps berdasarkan nama kuliner + lokasi Solo
+    final query = Uri.encodeComponent(
+      '${_culinary!.name} ${_culinary!.location} Solo',
+    );
+    final url = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$query',
+    );
+
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tidak bisa membuka Google Maps')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -294,9 +368,7 @@ Temukan lebih banyak kuliner lezat di Solo Raya dengan aplikasi Solo Explore!
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_culinary == null) {
@@ -326,7 +398,7 @@ Temukan lebih banyak kuliner lezat di Solo Raya dengan aplikasi Solo Explore!
               IconButton(
                 icon: Icon(
                   _isBookmarked ? Icons.bookmark : Icons.bookmark_outline,
-                  color: _isBookmarked ? AppColors.primary : Colors.white,  // ✅ FIXED: Add color
+                  color: _isBookmarked ? AppColors.primary : Colors.white,
                 ),
                 onPressed: _toggleBookmark,
               ),
@@ -344,7 +416,10 @@ Temukan lebih banyak kuliner lezat di Solo Raya dengan aplikasi Solo Explore!
                 children: [
                   if (_culinary!.categoryName != null)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.secondaryContainer,
                         borderRadius: BorderRadius.circular(100),
@@ -373,18 +448,46 @@ Temukan lebih banyak kuliner lezat di Solo Raya dengan aplikasi Solo Explore!
                       const SizedBox(width: 4),
                       Text(
                         '${_culinary!.rating}',
-                        style: GoogleFonts.beVietnamPro(fontWeight: FontWeight.w700),
+                        style: GoogleFonts.beVietnamPro(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       Text(
                         ' (${_culinary!.totalReviews} ulasan)',
-                        style: GoogleFonts.beVietnamPro(color: AppColors.onSurfaceVariant),
+                        style: GoogleFonts.beVietnamPro(
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                      ),
+
+                      const Spacer(), // Dorong tulisan "Lihat di Maps" ke ujung kanan
+                      // ✅ Berhasil disamakan dengan Destinasi
+                      InkWell(
+                        onTap: _openGoogleMapsReviews,
+                        borderRadius: BorderRadius.circular(4),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          child: Text(
+                            'Lihat di Maps ↗',
+                            style: GoogleFonts.beVietnamPro(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
                   _InfoRow(icon: Icons.location_on, text: _culinary!.location),
                   if (_culinary!.priceRange != null)
-                    _InfoRow(icon: Icons.payments, text: _culinary!.priceRange!),
+                    _InfoRow(
+                      icon: Icons.payments,
+                      text: _culinary!.priceRange!,
+                    ),
                   if (_culinary!.since != null)
                     _InfoRow(icon: Icons.history, text: _culinary!.since!),
                   if (_culinary!.isHalal == true)
@@ -504,6 +607,75 @@ Temukan lebih banyak kuliner lezat di Solo Raya dengan aplikasi Solo Explore!
                       ),
                     ),
                   ),
+                  const SizedBox(height: 32),
+                  Text(
+                    'Ulasan Pengunjung',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  if (_culinary!.reviews.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        'Belum ada ulasan. Jadilah yang pertama memberikan ulasan!',
+                        style: GoogleFonts.beVietnamPro(
+                          fontSize: 14,
+                          fontStyle: FontStyle.italic,
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                      ),
+                    )
+                  else
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _culinary!.reviews.length,
+                      separatorBuilder: (context, index) =>
+                          const Divider(height: 24),
+                      itemBuilder: (context, index) {
+                        final review = _culinary!.reviews[index];
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  review.userName ?? 'User',
+                                  style: GoogleFonts.beVietnamPro(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                Row(
+                                  children: List.generate(5, (starIndex) {
+                                    return Icon(
+                                      starIndex < review.rating
+                                          ? Icons.star
+                                          : Icons.star_border,
+                                      color: Colors.amber,
+                                      size: 16,
+                                    );
+                                  }),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              review.comment,
+                              style: GoogleFonts.beVietnamPro(
+                                fontSize: 14,
+                                color: AppColors.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
                 ],
               ),
             ),
@@ -513,6 +685,7 @@ Temukan lebih banyak kuliner lezat di Solo Raya dengan aplikasi Solo Explore!
     );
   }
 }
+
 
 class _InfoRow extends StatelessWidget {
   final IconData icon;
@@ -529,10 +702,7 @@ class _InfoRow extends StatelessWidget {
           Icon(icon, size: 20, color: AppColors.primary),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              text,
-              style: GoogleFonts.beVietnamPro(fontSize: 14),
-            ),
+            child: Text(text, style: GoogleFonts.beVietnamPro(fontSize: 14)),
           ),
         ],
       ),

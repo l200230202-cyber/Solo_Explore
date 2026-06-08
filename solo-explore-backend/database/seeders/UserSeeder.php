@@ -15,10 +15,11 @@ class UserSeeder extends Seeder
             'name' => 'Admin Solo Explore',
             'email' => 'admin@soloexplore.com',
             'password' => Hash::make('admin123'),
-            'phone' => '081234567899',
-            'bio' => 'Administrator',
+            'role' => 'super_admin',
+            'phone' => '081234567890',
+            'bio' => 'SuperAdministrator',
             'level' => 10,
-            'points' => 0,
+            'points' => 000,
             'total_destinations' => 0,
             'is_verified' => true,
             'is_admin' => true,
@@ -26,11 +27,12 @@ class UserSeeder extends Seeder
 
         // Create test user
         User::create([
-            'name' => 'Aditya Pratama',
-            'email' => 'aditya@example.com',
+            'name' => 'Amwis-admin wisata',
+            'email' => 'amwis@gmail.com',
             'password' => Hash::make('password123'),
-            'phone' => '081234567890',
-            'bio' => 'Lanskap Surakarta Explorer',
+            'role' => 'admin_mitra',
+            'phone' => '081234567891',
+            'bio' => 'Pemilik destinasi wisata',
             'level' => 4,
             'points' => 1250,
             'total_destinations' => 12,
@@ -40,10 +42,11 @@ class UserSeeder extends Seeder
 
         // Create additional test users
         User::create([
-            'name' => 'Budi Santoso',
-            'email' => 'budi@example.com',
+            'name' => 'Amner',
+            'email' => 'amner@gmail.com',
             'password' => Hash::make('password123'),
-            'phone' => '081234567891',
+            'role' => 'admin_mitra',
+            'phone' => '081234567892',
             'bio' => 'Solo Food Hunter',
             'level' => 2,
             'points' => 650,
@@ -53,13 +56,28 @@ class UserSeeder extends Seeder
         ]);
 
         User::create([
-            'name' => 'Citra Dewi',
-            'email' => 'citra@example.com',
+            'name' => 'Ubay',
+            'email' => 'ubay@gmail.com',
             'password' => Hash::make('password123'),
-            'phone' => '081234567892',
-            'bio' => 'Culture Enthusiast',
+            'role' => 'user',
+            'phone' => '081234567893',
+            'bio' => 'Destinatin Hunter',
             'level' => 3,
-            'points' => 1100,
+            'points' => 100,
+            'total_destinations' => 8,
+            'is_verified' => false,
+            'is_admin' => false,
+        ]);
+
+        User::create([
+            'name' => 'Usman',
+            'email' => 'usman@gmail.com',
+            'password' => Hash::make('password123'),
+            'role' => 'user',
+            'phone' => '081234567894',
+            'bio' => 'Food Hunter',
+            'level' => 4,
+            'points' => 200,
             'total_destinations' => 8,
             'is_verified' => false,
             'is_admin' => false,

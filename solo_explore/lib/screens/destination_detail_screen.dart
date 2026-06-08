@@ -71,7 +71,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
 
     final success = await ApiService().recordVisitDestination(_destination!.id);
 
-    if (!mounted) return; // Cek mounted di awal agar lebih aman
+    if (!mounted) return;
 
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -80,9 +80,7 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
           backgroundColor: Colors.green,
         ),
       );
-
     } else {
-      // 🛠️ TAMBAHAN: Munculkan notifikasi jika user sudah pernah berkunjung
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Kamu sudah pernah mencatat kunjungan di tempat ini!'),
@@ -115,19 +113,11 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
     );
   }
 
-  // 🛠️ SEKARANG MEMBUKA GOOGLE MAPS ASLI BERDASARKAN KOORDINAT & NAMA
   Future<void> _openDirections() async {
     if (_destination == null) return;
 
-    final lat = _destination!.latitude;
-    final lng = _destination!.longitude;
-    final name = Uri.encodeComponent(
-      '${_destination!.name} ${_destination!.location}',
-    );
-
-    // URL Skema universal untuk membuka Google Maps atau rute navigasi
     final url = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=$lat,$lng&query_place_id=$name',
+      'http://maps.google.com/?q=${Uri.encodeComponent('${_destination!.name} ${_destination!.location}')}',
     );
 
     try {
@@ -149,14 +139,10 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
     }
   }
 
-  // 🛠️ FUNGSI BARU UNTUK MELIHAT ULASAN LANGSUNG DI GOOGLE MAPS
   Future<void> _openGoogleMapsReviews() async {
     if (_destination == null) return;
-    final nameEncoded = Uri.encodeComponent(
-      '${_destination!.name} ${_destination!.location}',
-    );
     final url = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=$nameEncoded',
+      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent('${_destination!.name} ${_destination!.location}')}',
     );
 
     if (await canLaunchUrl(url)) {
@@ -240,7 +226,7 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
                       backgroundColor: Colors.green,
                     ),
                   );
-                  _loadData();
+                  _loadData(); // 🔄 REFRESH: Laravel menghitung ulang rating rata-rata & update list ulasan
                 }
               },
               child: Text('Kirim', style: GoogleFonts.beVietnamPro()),
@@ -349,6 +335,9 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
       );
     }
 
+    // 💡 Mengambil list ulasan dari model objek Destination (sesuaikan property jika berbeda nama)
+    final reviews = _destination!.reviews;
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -411,15 +400,13 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // 🛠️ SEKARANG KEDUA TOMBOL DIPISAH SECARA ADIL
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Wrap(
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        // 🛠️ TOMBOL 1: Klik rating/ulasan untuk membuka Dialog Ulasan Lokal
                         InkWell(
-                          onTap: _showReviewDialog, // Memicu fungsi lokal Anda
+                          onTap: _showReviewDialog,
                           borderRadius: BorderRadius.circular(4),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
@@ -451,15 +438,13 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
                             ),
                           ),
                         ),
-
                         Text(
                           '  •  ',
                           style: GoogleFonts.beVietnamPro(
                             color: AppColors.onSurfaceVariant,
                           ),
                         ),
-
-                        // 🛠️ TOMBOL 2: Hanya teks ini yang pergi ke luar (Google Maps)
+                        const Spacer(),
                         InkWell(
                           onTap: _openGoogleMapsReviews,
                           borderRadius: BorderRadius.circular(4),
@@ -589,7 +574,6 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // TOMBOL TAMBAH KE TRIP PLAN (GAMBAR 2)
                   SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -612,6 +596,82 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
                       ),
                     ),
                   ),
+
+                  // 🛠️ SECTION BARU: MENAMPILKAN ULASAN LOKAL DARI DATABASE
+                  const SizedBox(height: 32),
+                  Text(
+                    'Ulasan Pengguna (${reviews.length})',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (reviews.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Text(
+                        'Belum ada ulasan. Jadilah yang pertama memberikan ulasan!',
+                        style: GoogleFonts.beVietnamPro(
+                          color: AppColors.onSurfaceVariant,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    )
+                  else
+                    ListView.separated(
+                      padding: EdgeInsets.zero,
+                      physics: const NeverScrollableScrollPhysics(),
+                      shrinkWrap: true,
+                      // ✅ Menggunakan data ulasan asli dari objek _destination
+                      itemCount: _destination!.reviews.length,
+                      separatorBuilder: (_, _) => const Divider(height: 24),
+                      itemBuilder: (context, index) {
+                        final review = _destination!.reviews[index];
+
+                        // ✅ Membaca langsung properti objek model Review
+                        final userName = review.userName ?? 'Anonim';
+                        final userRating = review.rating;
+                        final userComment = review.comment;
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  userName,
+                                  style: GoogleFonts.beVietnamPro(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                Row(
+                                  children: List.generate(5, (starIndex) {
+                                    return Icon(
+                                      starIndex < userRating
+                                          ? Icons.star
+                                          : Icons.star_border,
+                                      color: Colors.amber,
+                                      size: 16,
+                                    );
+                                  }),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              userComment,
+                              style: GoogleFonts.beVietnamPro(
+                                fontSize: 14,
+                                color: AppColors.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
                 ],
               ),
             ),

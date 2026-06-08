@@ -17,6 +17,7 @@ class Culinary {
   final bool? isHalal;
   final bool? isFeatured;
   final bool? isBookmarked;
+  final List<Review> reviews; // ✅ Tambahkan ini
 
   Culinary({
     required this.id,
@@ -37,6 +38,7 @@ class Culinary {
     this.isHalal,
     this.isFeatured,
     this.isBookmarked,
+    this.reviews = const [], // ✅ Default ke list kosong
   });
 
   factory Culinary.fromJson(Map<String, dynamic> json) {
@@ -47,11 +49,17 @@ class Culinary {
       description: json['description'] ?? '',
       location: json['location'] ?? '',
       address: json['address'],
-      latitude: json['latitude'] != null ? double.tryParse(json['latitude'].toString()) : null,
-      longitude: json['longitude'] != null ? double.tryParse(json['longitude'].toString()) : null,
+      latitude: json['latitude'] != null
+          ? double.tryParse(json['latitude'].toString())
+          : null,
+      longitude: json['longitude'] != null
+          ? double.tryParse(json['longitude'].toString())
+          : null,
       image: json['image'] ?? '',
       images: json['images'] != null ? List<String>.from(json['images']) : [],
-      rating: json['rating'] != null ? double.tryParse(json['rating'].toString()) ?? 0.0 : 0.0,
+      rating: json['rating'] != null
+          ? double.tryParse(json['rating'].toString()) ?? 0.0
+          : 0.0,
       totalReviews: json['total_reviews'] ?? 0,
       priceRange: json['price_range'],
       since: json['since'],
@@ -59,6 +67,37 @@ class Culinary {
       isHalal: json['is_halal'],
       isFeatured: json['is_featured'],
       isBookmarked: json['is_bookmarked'],
+      // ✅ Parsing list ulasan dari API Laravel (biasanya key-nya 'reviews')
+      reviews: json['reviews'] != null
+          ? (json['reviews'] as List).map((r) => Review.fromJson(r)).toList()
+          : [],
+    );
+  }
+}
+
+// ✅ Tambahkan class Review penampung data ulasan jika belum ada
+class Review {
+  final int id;
+  final int rating;
+  final String comment;
+  final String? userName;
+
+  Review({
+    required this.id,
+    required this.rating,
+    required this.comment,
+    this.userName,
+  });
+
+  factory Review.fromJson(Map<String, dynamic> json) {
+    return Review(
+      id: json['id'],
+      rating: json['rating'] ?? 5,
+      comment: json['comment'] ?? '',
+      // Menyesuaikan key dari API Laravel, biasanya 'user' -> 'name' atau 'user_name'
+      userName:
+          json['user_name'] ??
+          (json['user'] != null ? json['user']['name'] : 'User'),
     );
   }
 }
