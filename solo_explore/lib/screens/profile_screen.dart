@@ -265,9 +265,10 @@ Future<void> _loadData() async {
     return VisibilityDetector(
       key: const Key('profile_screen_key'),
       onVisibilityChanged: (visibilityInfo) {
-        // Jika halaman profil aktif/terlihat penuh di layar HP
-        if (visibilityInfo.visibleFraction == 1.0) {
-          _loadData(); // 🔄 Jalankan auto-refresh ke backend Laravel
+        if (visibilityInfo.visibleFraction == 1.0 &&
+            !_isLoading &&
+            !_isPublicMode) {
+          _loadData();
         }
       },
       child: Scaffold(
