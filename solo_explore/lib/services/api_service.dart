@@ -11,8 +11,10 @@ import '../models/event.dart';
 class ApiService {
   // Gunakan 10.0.2.2 untuk Android emulator, atau IP lokal komputer untuk device fisik
   // Contoh device fisik: 'http://192.168.1.x:8000/api'
-  static const String baseUrl = 'http://192.168.0.3:8000/api';
+  static const String baseUrl = 'http://192.168.0.4:8000/api';
   String? _token;
+
+  String? get token => _token;
 
   Future<void> _loadToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -451,28 +453,61 @@ class ApiService {
 
   // Bookmarks
   Future<bool> toggleBookmark(String type, int id) async {
-    await _loadToken();
-    final response = await http.post(
-      Uri.parse('$baseUrl/bookmarks/${type}s/$id'),
-      headers: _headers(needsAuth: true),
-    );
-    final data = jsonDecode(response.body);
-    return data['success'] ?? false;
-  }
+    try {
+      String endpoint;
+      if (type == 'destination') {
+        endpoint = '/bookmarks/destinations/$id';
+      } else if (type == 'culinary') {
+        endpoint = '/bookmarks/culinaries/$id';
+      } else if (type == 'event') {
+        endpoint = '/bookmarks/events/$id';
+      } else {
+        throw Exception('Tipe bookmark tidak dikenali');
+      }
 
-  Future<List<Map<String, dynamic>>> getBookmarks() async {
-    await _loadToken();
-    final response = await http.get(
-      Uri.parse('$baseUrl/bookmarks'),
-      headers: _headers(needsAuth: true),
-    );
-    final data = jsonDecode(response.body);
-    if (data['success']) {
-      return List<Map<String, dynamic>>.from(data['data']);
+      await _loadToken(); // Load token terlebih dahulu
+      final response = await http.post(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: _headers(
+          needsAuth: _token != null,
+        ), // Gunakan header bawaan ApiService
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          return data['data']['is_bookmarked'] ?? false;
+        }
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error toggle bookmark: $e');
+      return false;
     }
-    return [];
   }
 
+  Future<Map<String, dynamic>> getBookmarks() async {
+    try {
+      await _loadToken(); // Load token terlebih dahulu
+      final response = await http.get(
+        Uri.parse('$baseUrl/bookmarks'),
+        headers: _headers(
+          needsAuth: _token != null,
+        ), // Gunakan header bawaan ApiService
+      );
+
+      final data = jsonDecode(response.body);
+      if (data['success'] == true && data['data'] != null) {
+        // Mengembalikan Map berisi destinations, culinaries, dan events
+        return data['data'] as Map<String, dynamic>;
+      }
+
+      return {'destinations': [], 'culinaries': [], 'events': []};
+    } catch (e) {
+      debugPrint('Error fetch getBookmarks: $e');
+      return {'destinations': [], 'culinaries': [], 'events': []};
+    }
+  }
   // =========================================================================
   // Search (Versi Aman & Stabil untuk Guest)
   // =========================================================================
@@ -607,28 +642,57 @@ class ApiService {
   // Profile
   Future<Map<String, dynamic>?> getProfile() async {
     await _loadToken();
-    final response = await http.get(
-      Uri.parse('$baseUrl/profile'),
-      headers: _headers(needsAuth: true),
-    );
-    final data = jsonDecode(response.body);
-    if (data['success']) {
-      return data['data'];
+
+    // 1. CEK TOKEN: Jika token kosong (Guest), langsung stop di sini tanpa menembak API
+    if (_token == null || _token!.isEmpty) {
+      return null;
     }
-    return null;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/profile'),
+        headers: _headers(needsAuth: true),
+      );
+
+      // 2. CEK STATUS CODE: Pastikan response backend sukses (200 OK)
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // Gunakan operator ?? false untuk mengamankan nilai null
+        if (data['success'] ?? false) {
+          return data['data'];
+        }
+      }
+      return null;
+    } catch (_) {
+      return null; // Kembalikan null dengan tenang jika terjadi gangguan jaringan
+    }
   }
 
   Future<Map<String, dynamic>?> getStats() async {
     await _loadToken();
-    final response = await http.get(
-      Uri.parse('$baseUrl/profile/stats'),
-      headers: _headers(needsAuth: true),
-    );
-    final data = jsonDecode(response.body);
-    if (data['success']) {
-      return data['data'];
+
+    // 1. CEK TOKEN: Jika Guest, langsung gagalkan secara halus
+    if (_token == null || _token!.isEmpty) {
+      return null;
     }
-    return null;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/profile/stats'),
+        headers: _headers(needsAuth: true),
+      );
+
+      // 2. CEK STATUS CODE
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] ?? false) {
+          return data['data'];
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<bool> updateProfile(Map<String, dynamic> data) async {

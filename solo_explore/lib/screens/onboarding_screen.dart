@@ -30,7 +30,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     ),
     _OnboardingData(
       image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAf6RLLPnik1xlvEelHuq988l5Tnva8FRjGlUzXjQQyB9m-qfTWkoOyv1qa-irLqarE5c4yrrffYU2duLP25RoNqFZPPU0U7GdjANf_WL0RpEwfCkQHC3DVV2qj47Wa6seF6oCbqPK9-6Hqlwjt5B3SOblNemtSUFXgsGaBzMOLnYsFB_rLeNEKR3BN3hEO4VTuu2MTFldH4CPFIJT_tdG5ni5ngQRjCNr3rzF7vY-zrZdhaI4hHoEBesL2l4F6IBXO7z7a8ax1IPU',
-      title: 'Kuliner Legendaris',
+      title: 'Kuliner',
       subtitle: 'Rasakan cita rasa autentik Nasi Liwet, Selat Solo, dan Serabi.',
       location: 'Kota Surakarta',
     ),

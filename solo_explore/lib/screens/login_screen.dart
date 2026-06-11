@@ -335,7 +335,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           GestureDetector(
                             onTap: () async {
                               final Uri url = Uri.parse(
-                                'http://192.168.0.3:8000/register-mitra',
+                                'http://192.168.0.4:8000/register-mitra',
                               );
 
                               if (!await launchUrl(

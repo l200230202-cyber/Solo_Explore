@@ -48,12 +48,21 @@ class _CulinaryDetailScreenState extends State<CulinaryDetailScreen> {
 
   Future<void> _toggleBookmark() async {
     if (_culinary == null) return;
-    final success = await ApiService().toggleBookmark(
+
+    // 1. ✅ Ambil status boolean asli dari Laravel (true = ter-bookmark, false = dihapus)
+    final bool currentBookmarkStatus = await ApiService().toggleBookmark(
       'culinary',
       _culinary!.id,
     );
-    if (success && mounted) {
-      setState(() => _isBookmarked = !_isBookmarked);
+
+    // 2. ✅ Karena fungsi ApiService barumu mengembalikan status bookmark (bukan status success req),
+    // kita hapus kondisi 'if (success)' lama, dan langsung update state jika widget masih mounted.
+    if (mounted) {
+      setState(() {
+        _isBookmarked =
+            currentBookmarkStatus; // 😉 Langsung pakai data asli dari database
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -62,20 +71,36 @@ class _CulinaryDetailScreenState extends State<CulinaryDetailScreen> {
           duration: const Duration(seconds: 1),
         ),
       );
+
+      // Mengambil data ulang (jika memang diperlukan untuk refresh info detail)
       _loadData();
     }
   }
 
   Future<void> _recordVisit() async {
     if (_culinary == null) return;
+
     final success = await ApiService().recordVisitCulinary(_culinary!.id);
+
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Kunjungan berhasil dicatat! +25 poin'),
+          content: Text('Kunjungan berhasil dicatat! +30 poin'),
           backgroundColor: Colors.green,
         ),
       );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Kamu pernah mencatat kunjungan di tempat ini',
+            style: TextStyle(fontFamily: 'BeVietnamPro'),
+          ),
+          backgroundColor: Colors.orange, // Warna oranye untuk peringatan
+          behavior: SnackBarBehavior.floating, // Efek melayang biar kekinian
+        ),
+      );
+      // ===============================================================
     }
   }
 
@@ -90,7 +115,7 @@ class _CulinaryDetailScreenState extends State<CulinaryDetailScreen> {
 ⭐ Rating: ${_culinary!.rating}/5.0
 ${_culinary!.categoryName ?? ''}
 
-${_culinary!.description.isNotEmpty ? _culinary!.description : 'Kuliner legendaris yang wajib dicoba!'}
+${_culinary!.description.isNotEmpty ? _culinary!.description : 'Kuliner yang wajib dicoba!'}
 
 Temukan lebih banyak kuliner lezat di Solo Raya dengan aplikasi Solo Explore!
 
@@ -384,6 +409,16 @@ Temukan lebih banyak kuliner lezat di Solo Raya dengan aplikasi Solo Explore!
           SliverAppBar(
             expandedHeight: 300,
             pinned: true,
+            // 1. ✅ Menggunakan dengan .withValues(alpha: 0.3) agar bebas warning
+            leading: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: CircleAvatar(
+                backgroundColor: Colors.black.withValues(alpha: 0.3),
+                foregroundColor: Colors.white,
+                child: const BackButton(),
+              ),
+            ),
+            backgroundColor: AppColors.primary,
             flexibleSpace: FlexibleSpaceBar(
               background: Image.network(
                 _culinary!.image,
@@ -395,16 +430,30 @@ Temukan lebih banyak kuliner lezat di Solo Raya dengan aplikasi Solo Explore!
               ),
             ),
             actions: [
-              IconButton(
-                icon: Icon(
-                  _isBookmarked ? Icons.bookmark : Icons.bookmark_outline,
-                  color: _isBookmarked ? AppColors.primary : Colors.white,
+              // 2. ✅ Perbaikan tombol Bookmark
+              Padding(
+                padding: const EdgeInsets.only(right: 4.0),
+                child: CircleAvatar(
+                  backgroundColor: Colors.black.withValues(alpha: 0.3),
+                  child: IconButton(
+                    icon: Icon(
+                      _isBookmarked ? Icons.bookmark : Icons.bookmark_outline,
+                      color: _isBookmarked ? AppColors.primary : Colors.white,
+                    ),
+                    onPressed: _toggleBookmark,
+                  ),
                 ),
-                onPressed: _toggleBookmark,
               ),
-              IconButton(
-                icon: const Icon(Icons.share),
-                onPressed: _shareCulinary,
+              // 3. ✅ Perbaikan tombol Share
+              Padding(
+                padding: const EdgeInsets.only(right: 16.0),
+                child: CircleAvatar(
+                  backgroundColor: Colors.black.withValues(alpha: 0.3),
+                  child: IconButton(
+                    icon: const Icon(Icons.share, color: Colors.white),
+                    onPressed: _shareCulinary,
+                  ),
+                ),
               ),
             ],
           ),

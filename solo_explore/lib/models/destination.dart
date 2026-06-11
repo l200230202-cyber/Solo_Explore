@@ -19,7 +19,7 @@ class Destination {
   final bool? isFeatured;
   final bool? isBookmarked;
   final String categoryName;
-  final List<Review> reviews; // ✅ Tambahkan ini
+  final List<Review> reviews;
 
   Destination({
     required this.id,
@@ -40,36 +40,52 @@ class Destination {
     this.isFeatured,
     this.isBookmarked,
     required this.categoryName,
-    this.reviews = const [], // ✅ Default ke list kosong
+    this.reviews = const [],
   });
 
   factory Destination.fromJson(Map<String, dynamic> json) {
     return Destination(
-      id: json['id'],
-      name: json['name'],
-      slug: json['slug'],
+      id: json['id'] ?? 0,
+      name: json['name'] ?? '',
+      slug: json['slug'] ?? '',
       description: json['description'] ?? '',
       location: json['location'] ?? '',
-      address: json['address'],
+      address: json['address'] ?? '',
+
       latitude: json['latitude'] != null
           ? double.tryParse(json['latitude'].toString())
           : null,
       longitude: json['longitude'] != null
           ? double.tryParse(json['longitude'].toString())
           : null,
+
       image: json['image'] ?? '',
       images: json['images'] != null ? List<String>.from(json['images']) : [],
+
+      // Mengamankan nilai rating 0.0 dari seeder database baru
       rating: json['rating'] != null
           ? double.tryParse(json['rating'].toString()) ?? 0.0
           : 0.0,
+
       totalReviews: json['total_reviews'] ?? 0,
-      ticketPrice: json['ticket_price'],
-      openingHours: json['opening_hours'],
-      isOpen: json['is_open'],
-      isFeatured: json['is_featured'],
-      isBookmarked: json['is_bookmarked'],
-      categoryName: json['category_name'] ?? '',
-      // ✅ Ambil data list ulasan wisata dari API Laravel
+      ticketPrice: json['ticket_price'] ?? 'Gratis / Hubungi Pengelola',
+      openingHours: json['opening_hours'] ?? '24 Jam',
+      categoryName: json['category_name'] ?? 'Wisata',
+
+      // Proteksi konversi data boolean (antisipasi TINYINT atau string status dari API)
+      isOpen: json['is_open'] is bool
+          ? json['is_open']
+          : (json['is_open'] == 1 || json['is_open'] == '1'),
+
+      isFeatured: json['is_featured'] is bool
+          ? json['is_featured']
+          : (json['is_featured'] == 1 || json['is_featured'] == '1'),
+
+      isBookmarked: json['is_bookmarked'] is bool
+          ? json['is_bookmarked']
+          : (json['is_bookmarked'] == 1 || json['is_bookmarked'] == '1'),
+
+      // Mengambil data list ulasan wisata dari API Laravel
       reviews: json['reviews'] != null
           ? (json['reviews'] as List).map((r) => Review.fromJson(r)).toList()
           : [],

@@ -377,7 +377,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
               child: Text(
-                'Wisata Populer',
+                'Wisata',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 28,
                   fontWeight: FontWeight.w600,
@@ -413,7 +413,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
               child: Text(
-                'Kuliner Legendaris',
+                'Kuliner',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 28,
                   fontWeight: FontWeight.w600,
@@ -885,53 +885,76 @@ class _KulinerCardState extends State<_KulinerCard> {
               ),
             ),
             const SizedBox(width: 16),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // ROW UTAMA YANG MENAMPUNG TEKS DAN TOMBOL BOOKMARK
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment
+                        .start, // Diubah ke start agar tombol bookmark tetap presisi di atas
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.secondaryContainer,
-                              borderRadius: BorderRadius.circular(100),
-                            ),
-                            child: Text(
-                              'Legendaris',
-                              style: GoogleFonts.beVietnamPro(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.onSecondaryContainer,
+                      // 1. BUNGKUS COLUMN TEKS DENGAN EXPANDED
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.secondaryContainer,
+                                borderRadius: BorderRadius.circular(100),
+                              ),
+                              child: Text(
+                                'Legendaris',
+                                style: GoogleFonts.beVietnamPro(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.onSecondaryContainer,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            widget.name,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.onSurface,
+                            const SizedBox(height: 4),
+                            // 2. BERIKAN MAXLINES & ELLIPSIS PADA NAMA KULINER
+                            Text(
+                              widget.name,
+                              maxLines:
+                                  1, // Batasi 1 baris agar tidak merusak baris rating di bawahnya
+                              overflow: TextOverflow
+                                  .ellipsis, // Otomatis jadi titik-titik (...) jika kepanjangan
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.onSurface,
+                              ),
                             ),
-                          ),
-                          Text(
-                            widget.since,
-                            style: GoogleFonts.beVietnamPro(
-                              fontSize: 11,
-                              color: AppColors.onSurfaceVariant,
+                            Text(
+                              widget.since,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.beVietnamPro(
+                                fontSize: 11,
+                                color: AppColors.onSurfaceVariant,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+
+                      // BERI JARAK AMAN ANTARA TEKS DAN TOMBOL
+                      const SizedBox(width: 8),
+
+                      // 3. TOMBOL BOOKMARK SEKARANG AMAN DI SISI KANAN
                       IconButton(
+                        constraints:
+                            const BoxConstraints(), // Mempersempit padding bawaan IconButton biar hemat space
+                        padding: EdgeInsets
+                            .zero, // Set ke nol agar tidak memakan ruang luar
                         icon: Icon(
                           _isBookmarked
                               ? Icons.bookmark

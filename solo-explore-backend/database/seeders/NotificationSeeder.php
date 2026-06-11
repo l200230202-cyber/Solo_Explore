@@ -53,8 +53,8 @@ class NotificationSeeder extends Seeder
                 'user_id' => $user->id,
                 'type' => 'points_earned',
                 'title' => '⭐ Poin Didapat!',
-                'message' => 'Kamu mendapat +50 poin dari kunjungan ke Keraton Surakarta!',
-                'data' => ['points' => 50, 'destination_id' => 1],
+                'message' => 'Kamu mendapat +30 poin dari kunjungan ke Keraton Surakarta!',
+                'data' => ['points' => 30, 'destination_id' => 1],
                 'is_read' => false,
             ],
         ];

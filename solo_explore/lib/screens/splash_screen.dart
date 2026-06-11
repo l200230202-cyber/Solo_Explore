@@ -19,21 +19,25 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkAuth() async {
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
 
     final token = prefs.getString('auth_token');
     final hasSeenOnboarding = prefs.getBool('has_seen_onboarding') ?? false;
 
-    if (token != null && token.isNotEmpty) {
+    // KONDISI 1: Jika user sudah login (token ada)
+    // ATAU user sudah pernah melewati onboarding sebelumnya (Guest lama)
+    if ((token != null && token.isNotEmpty) || hasSeenOnboarding) {
+      // Jalankan delay otomatis 2 detik, lalu langsung bypass ke Beranda
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, AppRouter.home);
-    } else if (hasSeenOnboarding) {
-      Navigator.pushReplacementNamed(context, AppRouter.home);
-    } else {
-      Navigator.pushReplacementNamed(context, AppRouter.onboarding);
+    }
+    // KONDISI 2: Jika benar-benar user baru gres (belum pernah lihat onboarding)
+    else {
+      // Jangan beri delay otomatis, biarkan halaman diam
+      // agar user bisa menikmati UI dan menekan tombol secara manual.
+      debugPrint("User baru terdeteksi: Menunggu interaksi tombol.");
     }
   }
 
@@ -120,10 +124,19 @@ class _SplashScreenState extends State<SplashScreen> {
                           ],
                         ),
                         TextButton(
-                          onPressed: () => Navigator.pushReplacementNamed(
-                            context,
-                            AppRouter.home,
-                          ),
+                          onPressed: () async {
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setBool(
+                              'has_seen_onboarding',
+                              true,
+                            ); // Tandai sudah lewat
+
+                            if (!context.mounted) return;
+                            Navigator.pushReplacementNamed(
+                              context,
+                              AppRouter.home,
+                            );
+                          },
                           child: Text(
                             'Lewati',
                             style: GoogleFonts.beVietnamPro(
@@ -307,10 +320,22 @@ class _SplashScreenState extends State<SplashScreen> {
                           width: double.infinity,
                           height: 56,
                           child: ElevatedButton.icon(
-                            onPressed: () => Navigator.pushReplacementNamed(
-                              context,
-                              AppRouter.onboarding,
-                            ),
+                            // 1. Ubah menjadi async untuk menyimpan data status onboarding
+                            onPressed: () async {
+                              final prefs =
+                                  await SharedPreferences.getInstance();
+                              // 2. Kunci status agar di pembukaan aplikasi berikutnya, user langsung bypass ke Home
+                              await prefs.setBool('has_seen_onboarding', true);
+
+                              if (!context.mounted) return;
+
+                              // 3. Alihkan navigasi langsung ke halaman Beranda/Home (Bukan login/onboarding)
+                              Navigator.pushReplacementNamed(
+                                context,
+                                AppRouter
+                                    .home, // Mengarah ke MainShell / Beranda umum
+                              );
+                            },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,

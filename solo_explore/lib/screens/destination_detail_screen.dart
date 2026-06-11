@@ -48,12 +48,19 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
 
   Future<void> _toggleBookmark() async {
     if (_destination == null) return;
-    final success = await ApiService().toggleBookmark(
+
+    // 1. ✅ Ambil status boolean asli dari backend (true = ter-bookmark, false = terhapus)
+    final bool currentBookmarkStatus = await ApiService().toggleBookmark(
       'destination',
       _destination!.id,
     );
-    if (success && mounted) {
-      setState(() => _isBookmarked = !_isBookmarked);
+
+    // 2. ✅ Update state secara aman berdasarkan data mutakhir dari database
+    if (mounted) {
+      setState(() {
+        _isBookmarked = currentBookmarkStatus;
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -62,6 +69,8 @@ class _DestinationDetailScreenState extends State<DestinationDetailScreen> {
           duration: const Duration(seconds: 1),
         ),
       );
+
+      // Mengambil data ulang untuk menyegarkan informasi di halaman detail jika diperlukan
       _loadData();
     }
   }
@@ -344,6 +353,17 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
           SliverAppBar(
             expandedHeight: 300,
             pinned: true,
+            // 1. ✅ Amankan tombol back/leading dengan lingkaran kontras modern
+            leading: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: CircleAvatar(
+                backgroundColor: Colors.black.withValues(alpha: 0.3),
+                foregroundColor: Colors.white,
+                child: const BackButton(),
+              ),
+            ),
+            backgroundColor:
+                AppColors.primary, // Warna AppBar saat di-scroll ke atas
             flexibleSpace: FlexibleSpaceBar(
               background: Image.network(
                 _destination!.image,
@@ -355,15 +375,33 @@ Jelajahi lebih banyak destinasi menarik di Solo Raya dengan aplikasi Solo Explor
               ),
             ),
             actions: [
-              IconButton(
-                icon: Icon(
-                  _isBookmarked ? Icons.bookmark : Icons.bookmark_outline,
+              // 2. ✅ Amankan tombol Bookmark
+              Padding(
+                padding: const EdgeInsets.only(right: 4.0),
+                child: CircleAvatar(
+                  backgroundColor: Colors.black.withValues(alpha: 0.3),
+                  child: IconButton(
+                    icon: Icon(
+                      _isBookmarked ? Icons.bookmark : Icons.bookmark_outline,
+                      // Beri warna utama jika ter-bookmark, beri warna putih jika tidak
+                      color: _isBookmarked ? AppColors.primary : Colors.white,
+                    ),
+                    onPressed: _toggleBookmark,
+                  ),
                 ),
-                onPressed: _toggleBookmark,
               ),
-              IconButton(
-                icon: const Icon(Icons.share),
-                onPressed: _shareDestination,
+              // 3. ✅ Amankan tombol Share
+              Padding(
+                padding: const EdgeInsets.only(
+                  right: 16.0,
+                ), // Jarak aman dari tepi kanan layar
+                child: CircleAvatar(
+                  backgroundColor: Colors.black.withValues(alpha: 0.3),
+                  child: IconButton(
+                    icon: const Icon(Icons.share, color: Colors.white),
+                    onPressed: _shareDestination,
+                  ),
+                ),
               ),
             ],
           ),

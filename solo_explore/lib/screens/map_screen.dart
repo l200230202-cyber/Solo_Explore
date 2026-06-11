@@ -92,7 +92,7 @@ class _MapScreenState extends State<MapScreen> {
     // Gunakan '10.0.2.2' jika menggunakan emulator Android bawaan Google
     // Gunakan IP lokal Wi-Fi laptopmu (misal '192.168.1.x') jika testing dengan HP fisik
     final String url =
-        'http://192.168.0.3:8000/api/destinations/nearby?lat=$lat&lng=$lng';
+        'http://192.168.0.4:8000/api/destinations/nearby?lat=$lat&lng=$lng';
 
     try {
       final response = await http.get(Uri.parse(url));

@@ -4,6 +4,8 @@ import '../core/theme.dart';
 import '../services/api_service.dart';
 import '../core/app_router.dart';
 import 'package:visibility_detector/visibility_detector.dart';
+import '../screens/bookmarks_screen.dart';
+import 'level_guide_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,6 +17,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _profile;
   Map<String, dynamic>? _stats;
+
 
   bool _isLoading = true;
   bool _isPublicMode = false;
@@ -84,6 +87,7 @@ Future<void> _loadData() async {
           // Baris _visits = ... Dihapus dari sini 🗑️
           _isPublicMode = false;
           _isLoading = false;
+
         });
       }
     } catch (e) {
@@ -188,6 +192,28 @@ Future<void> _loadData() async {
     return 'Beginner Explorer';
   }
 
+  Future<void> _refreshDataTanpaLoadingLampu() async {
+    try {
+      final bool isLoggedIn = await ApiService().hasToken();
+      if (!isLoggedIn) return;
+
+      // Ambil data terbaru dari Laravel secara diam-diam
+      final results = await Future.wait([
+        ApiService().getProfile(),
+        ApiService().getStats(),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _profile = results[0];
+          _stats = results[1]; // Poin baru otomatis ter-update di sini!
+        });
+      }
+    } catch (e) {
+      debugPrint('Silent refresh gagal: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // 1. Jika masih loading, tampilkan indikator loading
@@ -265,10 +291,10 @@ Future<void> _loadData() async {
     return VisibilityDetector(
       key: const Key('profile_screen_key'),
       onVisibilityChanged: (visibilityInfo) {
-        if (visibilityInfo.visibleFraction == 1.0 &&
-            !_isLoading &&
-            !_isPublicMode) {
-          _loadData();
+        // ✅ Jika halaman profil terlihat penuh di layar, jalankan refresh data poin ke Laravel
+        if (visibilityInfo.visibleFraction == 1.0) {
+          // Kita jalankan secara background tanpa memicu loading screen berputar yang mengganggu
+          _refreshDataTanpaLoadingLampu();
         }
       },
       child: Scaffold(
@@ -474,6 +500,7 @@ Future<void> _loadData() async {
                           subIcon: Icons.trending_up,
                         ),
                       ),
+                      
                       const SizedBox(width: 16),
                       Expanded(
                         child: _StatCard(
@@ -485,6 +512,120 @@ Future<void> _loadData() async {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 20),
+
+                    // TOMBOL MENU MENUJU PANDUAN LEVEL
+                    Card(
+                      elevation: 0,
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: AppColors.outlineVariant.withAlpha(
+                            (255 * 0.5).round(),
+                          ),
+                        ),
+                      ),
+                      color: AppColors.surface,
+                      child: ListTile(
+                        onTap: () {
+                          // Navigasi ke halaman panduan
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const LevelGuideScreen(),
+                            ),
+                          );
+                        },
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withAlpha(
+                              (255 * 0.1).round(),
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.military_tech_rounded,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        title: Text(
+                          'Panduan Leveling',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Lihat tingkatan explorer & cara raih poin',
+                          style: GoogleFonts.beVietnamPro(
+                            fontSize: 12,
+                            color: AppColors.onSurfaceVariant,
+                          ),
+                        ),
+                        trailing: Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 24),
+                  // MENU BOOKMARK
+                   Container(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                      ), // Menyamakan posisi kanan-kiri dengan Card atas
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ), // Mengganti padding manualmu yang tidak simetris
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerLowest,
+                        borderRadius: BorderRadius.circular(12),
+                        // Opsional: Tambahkan border jika ingin sama persis dengan card panduan
+                        border: Border.all(
+                          color: AppColors.outlineVariant.withAlpha(
+                            (255 * 0.5).round(),
+                          ),
+                        ),
+                      ),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        minLeadingWidth:
+                            0, // Dikecilkan agar icon tidak terlalu jauh jaraknya ke teks judul
+                        dense: true,
+                        leading: const Icon(
+                          Icons.bookmark_outline,
+                          size: 22,
+                          color: AppColors.primary,
+                        ),
+                        title: Text(
+                          'Bookmark Saya',
+                          style: GoogleFonts.plusJakartaSans(
+                            // Disamakan agar jenis font menunya seragam
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                        trailing: const Icon(
+                          Icons.chevron_right_rounded,
+                          size: 20,
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const BookmarksScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  const SizedBox(height: 24),
                   // Visit history
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
